@@ -28,5 +28,10 @@ R was chosen for these operations due to its robust geospatial libraries, which 
 		A 1500-meter buffer zone is created around each field location.
 	2.	Data Extraction:
 		The exactextractr package extracts data for crop pixels (crop code 43 for potatoes) within the buffer zone.
-	3.	**Intensity Calculation:**
+	3.	Intensity Calculation:
 		The function calculates the proportion of potato pixels relative to the total area within the buffer zone.
+
+  ## Process Overview
+	•	The proportion is calculated as: <br>
+**(Potato Pixels / Total Area) × 100%** <br>
+	•	This approach ensures the computation is independent of field names, focusing entirely on spatial analysis. <br>
