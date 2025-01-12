@@ -34,7 +34,7 @@ R was chosen for these operations due to its robust geospatial libraries, which 
 ## Process Overview
  <br>
 The proportion is calculated as: <br>
-**(Potato Pixels / Total Area) × 100%** 
+<b>(Potato Pixels / Total Area) × 100%  </b>
 <br>
 <br>
 This approach ensures the computation is independent of field names, focusing entirely on spatial analysis. <br>
