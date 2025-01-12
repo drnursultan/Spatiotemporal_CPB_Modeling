@@ -31,7 +31,14 @@ R was chosen for these operations due to its robust geospatial libraries, which 
 	3.	Intensity Calculation:
 		The function calculates the proportion of potato pixels relative to the total area within the buffer zone.
 
-  ## Process Overview
-	•	The proportion is calculated as: <br>
+## Process Overview
+	• The proportion is calculated as: <br>
 **(Potato Pixels / Total Area) × 100%** <br>
-	•	This approach ensures the computation is independent of field names, focusing entirely on spatial analysis. <br>
+	• This approach ensures the computation is independent of field names, focusing entirely on spatial analysis. <br>
+
+ ## Benefits 
+	• **Speed and Efficiency:** The R packages used are highly optimized for handling large raster datasets. <br>
+	• **Scalability**: Suitable for analyzing multiple fields and years efficiently. <br>
+	• Accuracy: Ensures precise calculation of potato intensity with minimal errors.
+
+ 
