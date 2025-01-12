@@ -18,9 +18,9 @@ R was chosen for these operations due to its robust geospatial libraries, which 
 ## Workflow
 
 **R Packages Used** <br>
-	•	terra: For raster data manipulation. <br>
-	•	sf: For handling spatial vector data. <br>
-	•	exactextractr: For extracting raster data within specified buffer zones. <br>
+	• terra: For raster data manipulation. <br>
+	• sf: For handling spatial vector data. <br>
+	• exactextractr: For extracting raster data within specified buffer zones. <br>
 
  
 ## How It Works
@@ -37,8 +37,8 @@ R was chosen for these operations due to its robust geospatial libraries, which 
 	• This approach ensures the computation is independent of field names, focusing entirely on spatial analysis. <br>
 
  ## Benefits 
-	• **Speed and Efficiency:** The R packages used are highly optimized for handling large raster datasets. <br>
-	• **Scalability**: Suitable for analyzing multiple fields and years efficiently. <br>
+	• Speed and Efficiency: The R packages used are highly optimized for handling large raster datasets. <br>
+	• Scalability: Suitable for analyzing multiple fields and years efficiently. <br>
 	• Accuracy: Ensures precise calculation of potato intensity with minimal errors.
 
  
