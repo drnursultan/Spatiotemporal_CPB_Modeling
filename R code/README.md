@@ -5,8 +5,21 @@ This section contains **R scripts** used for identifying crop types and calculat
 
 ## Key Features
 
-**Crop Type Identification**
-	•	Crop types are identified using small buffer zones around each field, allowing precise spatial analysis.
+**Crop Type Identification** <br>
+	• Crop types are identified using small buffer zones around each field, allowing precise spatial analysis.
 
-**Potato Intensity Calculation**
-	•	Potato intensity is computed using a 1500-meter buffer zone, accounting for the spatial movement potential of Colorado Potato Beetles (CPB).
+**Potato Intensity Calculation** <br>
+	• Potato intensity is computed using a **1500-meter buffer zone**, accounting for the spatial movement potential of Colorado Potato Beetles (CPB).
+
+ # Why R?
+
+R was chosen for these operations due to its robust geospatial libraries, which are highly optimized for raster data processing. Packages like terra, sf, and exactextractr enable efficient extraction and analysis of data, outperforming Python in similar use cases.
+
+## Workflow
+
+**R Packages Used** <br>
+	•	terra: For raster data manipulation. <br>
+	•	sf: For handling spatial vector data. <br>
+	•	exactextractr: For extracting raster data within specified buffer zones. <br>
+
+ 
