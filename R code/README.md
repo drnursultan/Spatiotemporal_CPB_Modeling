@@ -23,3 +23,10 @@ R was chosen for these operations due to its robust geospatial libraries, which 
 	•	exactextractr: For extracting raster data within specified buffer zones. <br>
 
  
+## How It Works
+	1.	Buffer Zone Creation:
+	•	A 1500-meter buffer zone is created around each field location.
+	2.	Data Extraction:
+	•	The exactextractr package extracts data for crop pixels (crop code 43 for potatoes) within the buffer zone.
+	3.	Intensity Calculation:
+	•	The function calculates the proportion of potato pixels relative to the total area within the buffer zone.
