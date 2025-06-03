@@ -32,3 +32,5 @@ This project investigates the spatiotemporal dynamics of Colorado Potato Beetle 
 - Intermediate tables: `data/interim/`
 - Final dataset: `data/processed/final_data_for_modeling.csv`
 
+👉 **View the full report here:**  
+🔗 [Open HTML Report](https://drnursultan.github.io/Spatiotemporal_CPB_Modeling/)
