@@ -20,14 +20,11 @@ INTERIM_DATA_DIR <- "../data/interim/"
 PROCESSED_DATA_DIR <- "../data/processed/"
 ```
 
-
 ```{r}
 data <- read.csv(file.path(PROCESSED_DATA_DIR, 'final_data_for_modeling.csv'))
 print(dim(data))
 print(head(data, 3))
 ```
-
-
 
 ```{r}
 # Create target: average CPB abundance
@@ -52,12 +49,13 @@ for (v in numeric_vars) {
 ```
 
 ### How many fields has crop type - potato
+
 ```{r}
 nrow(data[data['croptype']==1,])
 ```
 
-
 ## Random effects testing
+
 ```{r}
 # (a) Null vs. farm random effect
 model_null  <- lm(cpb_abundance ~ 1, data = data)
@@ -70,6 +68,7 @@ anova(model_farm,model_null)
 model_farm_year <- lmer(cpb_abundance ~ 1 + (1 | farm) + (1 | year), data = data, REML = TRUE)
 anova(model_farm, model_farm_year)
 ```
+
 ```{r}
 # --- Full mixed-effects model
 full_model <- lmer(
@@ -89,11 +88,10 @@ df_exact <- 3266 - 17
 qt(0.975, df_exact)  # e.g. ~1.96
 ```
 
-
 ```{r}
 # --- Variance explained by random effects (ICC)
-icc_val <- performance::icc(full_model)
-print(icc_val)
+#icc_val <- performance::icc(full_model)
+#print(icc_val)
 r2_vals <- performance::r2(full_model)
 print(r2_vals)
 ```
@@ -104,4 +102,3 @@ print(AIC(full_model))
 mse <- mean(residuals(full_model)^2, na.rm = TRUE)
 print(mse)
 ```
-

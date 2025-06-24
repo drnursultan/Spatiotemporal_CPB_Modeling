@@ -1,5 +1,73 @@
 ---
-title: "R Notebook"
+title: "GAMM Model for Mixed + Spatial effects (mgcv)"
 output: html_notebook
 ---
 
+## Setup
+
+```{r}
+# --- Setup
+if (!require(mgcv)) {
+  install.packages("mgcv")
+  library(mgcv)
+}
+
+# Input/output folder paths
+RAW_DATA_DIR <- "../data/raw/"
+INTERIM_DATA_DIR <- "../data/interim/"
+PROCESSED_DATA_DIR <- "../data/processed/"
+```
+
+```{r}
+data <- read.csv(file.path(PROCESSED_DATA_DIR, 'final_data_for_modeling.csv'))
+print(dim(data))
+print(head(data, 3))
+```
+
+```{r}
+# Create target: average CPB abundance
+data$cpb_abundance <- (data$cpba_count + data$cpbl_count) / 2
+data$croptype <- ifelse(data$croptype == 43, 1, 0)
+
+
+# --- Scale numeric predictors
+numeric_vars <- c(
+  "gdd", "cum_gdd", "wei_intensity", "wei_prop",
+  "summer_avg_temp", "summer_avg_percip", "summer_heavy_rainfall_days",
+  "summer_hottest_temp","summer_temp_variability", "winter_coldest_temp",
+  "winter_extreme_cold_days", "winter_temp_variability",
+  "winter_warm_day_count","winter_heavy_rainfall_days",  "spring_frost_free_days"
+)
+
+# Scale each numeric variable if it exists in data
+for (v in numeric_vars) {
+  if (v %in% names(data)) data[[v]] <- scale(data[[v]])
+}
+
+data$farm <- as.factor(data$farm)
+data$year <- as.factor(data$year)
+
+```
+
+## Fit GAM with Spatial Smoothing
+
+```{r}
+gam_model <- gam(cpb_abundance ~ s(lat, lng) + s(year, bs = "re") + s(farm, bs = "re") +
+                  gdd + cum_gdd + croptype + wei_intensity + wei_prop +
+                  summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days +
+                  summer_temp_variability + summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days +
+                  winter_temp_variability + winter_warm_day_count + winter_heavy_rainfall_days + spring_frost_free_days,
+                data = data, family = gaussian())
+
+# Print the model summary and AIC
+summary(gam_model)
+
+```
+
+```{r}
+cat("AIC:", AIC(gam_model), "\n")
+
+res <- residuals(gam_model)
+mse <- mean(res^2)
+print(mse)
+```

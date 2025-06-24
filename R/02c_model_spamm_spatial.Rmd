@@ -1,5 +1,5 @@
 ---
-title: "spaMM model for Mix & Spatial effects (Matern)"
+title: "spaMM Model for Mixed + Spatial effects (Matern)"
 output: html_notebook
 ---
 
@@ -145,14 +145,6 @@ cat(
   "Conditional AIC (spamm_RF):  ", round(condAIC_RF, 2), "\n",
   "Conditional AIC (spamm_SRF): ", round(condAIC_SRF, 2), "\n"
 )
-```
-
-```{r}
-# Run the bootstrap LRT and capture its p‑value
-lrt     <- anova(spamm_RF, spamm_SRF, boot.repl = 200)
-p_boot  <- lrt$`Pr(>Chisq)`[2]
-
-cat("Bootstrap LRT p‑value for adding spatial term:", signif(p_boot, 3), "\n")
 ```
 
 
