@@ -72,10 +72,9 @@ anova(model_farm, model_farm_year)
 ```{r}
 # --- Full mixed-effects model
 full_model <- lmer(
-  cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop +
-    summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days +
-    summer_temp_variability + summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days +
-    winter_temp_variability + winter_warm_day_count + winter_heavy_rainfall_days + spring_frost_free_days +
+  cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop + summer_avg_temp + 
+    summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
+    winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
     (1 | farm) + (1 | year),
   data = data, REML = TRUE
 )
