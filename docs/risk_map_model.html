@@ -1625,6 +1625,12 @@ comparison</h1>
 </div>
 
 
+<div id="model-selection-for-risk-mapping" class="section level3">
+<h3>Model selection for risk mapping</h3>
+<p>In this section, we test alternative spatial mixed-effects models
+(spaMM) to identify the most appropriate specification for generating a
+statewide risk map of Colorado potato beetle (CPB) abundance in
+Wisconsin.</p>
 <pre class="r"><code># ---- Libraries ----
 
 suppressPackageStartupMessages({
@@ -1650,6 +1656,7 @@ if (!require(spaMM)) {
 ## and &#39;citation(&#39;spaMM&#39;)&#39; for proper citation.
 ## Further infos, slides, etc. at https://gitlab.mbb.univ-montp2.fr/francois/spamm-ref.</code></pre>
 <pre class="r"><code>theme_set(theme_bw())</code></pre>
+</div>
 <div id="data-paths" class="section level3">
 <h3>Data &amp; paths</h3>
 <pre class="r"><code># ---- Paths ----
@@ -1711,17 +1718,13 @@ form_sig_noFarm &lt;-
 <pre class="r"><code>set.seed(123)
 
 spaMM_full       &lt;- fitme(form_full,       data = data, family = gaussian())</code></pre>
-<pre><code>## (One-time message:) Choosing matrix methods took 1.82 s.
-##   If you perform many similarly costly fits, setting the method
-##   by control.HLfit=list(algebra=&lt;&quot;spprec&quot;|&quot;spcorr&quot;|&quot;decorr&quot;&gt;) may be useful,
-##   see help(&quot;algebra&quot;). &quot;decorr&quot; has been selected here.</code></pre>
 <pre><code>## Using paralellisation might be useful. See help(&quot;setNbThreads&quot;)</code></pre>
 <pre><code>## If the &#39;RSpectra&#39; package were installed, an extreme eigenvalue computation could be faster.</code></pre>
 <pre class="r"><code>spaMM_sig_RE     &lt;- fitme(form_sig_RE,     data = data, family = gaussian())</code></pre>
 <pre><code>## Using paralellisation might be useful. See help(&quot;setNbThreads&quot;)</code></pre>
 <pre class="r"><code>spaMM_sig_noFarm &lt;- fitme(form_sig_noFarm, data = data, family = gaussian())</code></pre>
 <pre><code>## Using paralellisation might be useful. See help(&quot;setNbThreads&quot;)</code></pre>
-<pre class="r"><code># Quick summaries (optional to print)
+<pre class="r"><code># Quick summaries 
 summary(spaMM_full)</code></pre>
 <pre><code>## formula: cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop + 
 ##     summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days + 
@@ -1873,133 +1876,52 @@ summary(spaMM_full)</code></pre>
     MSE = round(MSE, 3),
     R2_marginal = round(R2_marginal, 3),
     R2_conditional = round(R2_conditional, 3)
-  )
-
-cmp</code></pre>
+  )</code></pre>
+</div>
+<div id="model-comparisons" class="section level3">
+<h3>Model comparisons</h3>
+<p>We compared three candidate spaMM models:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Full spaMM model</strong> including all screened predictors,
+year and farm random effects, and a Matérn spatial correlation
+term.<br />
+</li>
+<li><strong>Reduced spaMM model</strong> including only statistically
+significant predictors (cumulative GDD, weighted potato intensity, heavy
+rainfall days, and winter coldest-day temperature) together with year
+and farm random effects.<br />
+</li>
+<li><strong>Reduced spaMM without farm random effect</strong>, designed
+to match the prediction grid where farm identifiers are not
+available.</li>
+</ol>
+<p>All three models performed similarly in terms of predictive accuracy.
+The reduced specification with only significant predictors achieved
+nearly identical fit to the full model (slightly lower AIC, comparable
+<span class="math inline">\(R^2\)</span> values), demonstrating that
+unnecessary variables could be omitted without loss of performance. The
+no-farm model showed modestly lower conditional <span class="math inline">\(R^2\)</span>, but remained stable and
+interpretable, making it appropriate for statewide mapping where grid
+cells are treated independently of farm identity.</p>
+</div>
+<div id="performance-results" class="section level3">
+<h3>Performance results</h3>
+<pre class="r"><code>cmp[c(2, 6, 10), ]</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["model"],"name":[1],"type":["chr"],"align":["left"]},{"label":["AIC"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MSE"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["R2_marginal"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["R2_conditional"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"spaMM_full (all predictors + year + farm + Matérn)","2":"11730.1","3":"1.795","4":"0.188","5":"0.658"},{"1":"spaMM_full (all predictors + year + farm + Matérn)","2":"11550.2","3":"1.795","4":"0.188","5":"0.658"},{"1":"spaMM_full (all predictors + year + farm + Matérn)","2":"11704.1","3":"1.795","4":"0.188","5":"0.658"},{"1":"spaMM_full (all predictors + year + farm + Matérn)","2":"3083.5","3":"1.795","4":"0.188","5":"0.658"},{"1":"spaMM_sig_RE (signif. predictors + year + farm + Matérn)","2":"11724.1","3":"1.805","4":"0.192","5":"0.648"},{"1":"spaMM_sig_RE (signif. predictors + year + farm + Matérn)","2":"11548.0","3":"1.805","4":"0.192","5":"0.648"},{"1":"spaMM_sig_RE (signif. predictors + year + farm + Matérn)","2":"11714.1","3":"1.805","4":"0.192","5":"0.648"},{"1":"spaMM_sig_RE (signif. predictors + year + farm + Matérn)","2":"3094.0","3":"1.805","4":"0.192","5":"0.648"},{"1":"spaMM_sig_noFarm (signif. predictors + year + Matérn)","2":"11847.5","3":"1.865","4":"0.207","5":"0.559"},{"1":"spaMM_sig_noFarm (signif. predictors + year + Matérn)","2":"11714.2","3":"1.865","4":"0.207","5":"0.559"},{"1":"spaMM_sig_noFarm (signif. predictors + year + Matérn)","2":"11837.5","3":"1.865","4":"0.207","5":"0.559"},{"1":"spaMM_sig_noFarm (signif. predictors + year + Matérn)","2":"3065.3","3":"1.865","4":"0.207","5":"0.559"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["model"],"name":[1],"type":["chr"],"align":["left"]},{"label":["AIC"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MSE"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["R2_marginal"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["R2_conditional"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"spaMM_full (all predictors + year + farm + Matérn)","2":"11550.2","3":"1.795","4":"0.188","5":"0.658"},{"1":"spaMM_sig_RE (signif. predictors + year + farm + Matérn)","2":"11548.0","3":"1.805","4":"0.192","5":"0.648"},{"1":"spaMM_sig_noFarm (signif. predictors + year + Matérn)","2":"11714.2","3":"1.865","4":"0.207","5":"0.559"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<pre class="r"><code># Nice table
-knitr::kable(
-  cmp,
-  caption = &quot;Comparison of spaMM models used for risk mapping&quot;,
-  align = &quot;lrrrr&quot;
-)</code></pre>
-<table>
-<caption>Comparison of spaMM models used for risk mapping</caption>
-<colgroup>
-<col width="58%" />
-<col width="8%" />
-<col width="6%" />
-<col width="12%" />
-<col width="15%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="left">model</th>
-<th align="right">AIC</th>
-<th align="right">MSE</th>
-<th align="right">R2_marginal</th>
-<th align="right">R2_conditional</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">spaMM_full (all predictors + year + farm + Matérn)</td>
-<td align="right">11730.1</td>
-<td align="right">1.795</td>
-<td align="right">0.188</td>
-<td align="right">0.658</td>
-</tr>
-<tr class="even">
-<td align="left">spaMM_full (all predictors + year + farm + Matérn)</td>
-<td align="right">11550.2</td>
-<td align="right">1.795</td>
-<td align="right">0.188</td>
-<td align="right">0.658</td>
-</tr>
-<tr class="odd">
-<td align="left">spaMM_full (all predictors + year + farm + Matérn)</td>
-<td align="right">11704.1</td>
-<td align="right">1.795</td>
-<td align="right">0.188</td>
-<td align="right">0.658</td>
-</tr>
-<tr class="even">
-<td align="left">spaMM_full (all predictors + year + farm + Matérn)</td>
-<td align="right">3083.5</td>
-<td align="right">1.795</td>
-<td align="right">0.188</td>
-<td align="right">0.658</td>
-</tr>
-<tr class="odd">
-<td align="left">spaMM_sig_RE (signif. predictors + year + farm +
-Matérn)</td>
-<td align="right">11724.1</td>
-<td align="right">1.805</td>
-<td align="right">0.192</td>
-<td align="right">0.648</td>
-</tr>
-<tr class="even">
-<td align="left">spaMM_sig_RE (signif. predictors + year + farm +
-Matérn)</td>
-<td align="right">11548.0</td>
-<td align="right">1.805</td>
-<td align="right">0.192</td>
-<td align="right">0.648</td>
-</tr>
-<tr class="odd">
-<td align="left">spaMM_sig_RE (signif. predictors + year + farm +
-Matérn)</td>
-<td align="right">11714.1</td>
-<td align="right">1.805</td>
-<td align="right">0.192</td>
-<td align="right">0.648</td>
-</tr>
-<tr class="even">
-<td align="left">spaMM_sig_RE (signif. predictors + year + farm +
-Matérn)</td>
-<td align="right">3094.0</td>
-<td align="right">1.805</td>
-<td align="right">0.192</td>
-<td align="right">0.648</td>
-</tr>
-<tr class="odd">
-<td align="left">spaMM_sig_noFarm (signif. predictors + year +
-Matérn)</td>
-<td align="right">11847.5</td>
-<td align="right">1.865</td>
-<td align="right">0.207</td>
-<td align="right">0.559</td>
-</tr>
-<tr class="even">
-<td align="left">spaMM_sig_noFarm (signif. predictors + year +
-Matérn)</td>
-<td align="right">11714.2</td>
-<td align="right">1.865</td>
-<td align="right">0.207</td>
-<td align="right">0.559</td>
-</tr>
-<tr class="odd">
-<td align="left">spaMM_sig_noFarm (signif. predictors + year +
-Matérn)</td>
-<td align="right">11837.5</td>
-<td align="right">1.865</td>
-<td align="right">0.207</td>
-<td align="right">0.559</td>
-</tr>
-<tr class="even">
-<td align="left">spaMM_sig_noFarm (signif. predictors + year +
-Matérn)</td>
-<td align="right">3065.3</td>
-<td align="right">1.865</td>
-<td align="right">0.207</td>
-<td align="right">0.559</td>
-</tr>
-</tbody>
-</table>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>Given the similar performance of the full and reduced models, and the
+practical need to omit farm-level effects for grid-based prediction, we
+adopt the <strong>reduced spaMM without farm effect</strong> as the
+final model for generating the Wisconsin CPB risk map. This
+specification balances parsimony, stability, and predictive accuracy,
+while avoiding overfitting to local farm-level variation that cannot be
+projected statewide.</p>
 </div>
 
 
