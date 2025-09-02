@@ -1,6 +1,8 @@
 ---
 title: "Random Effect Model (lmer)"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ## Setup
@@ -72,7 +74,7 @@ anova(model_farm, model_farm_year)
 ```{r}
 # --- Full mixed-effects model
 full_model <- lmer(
-  cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop + summer_avg_temp + 
+  cpb_abundance ~ gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
     (1 | farm) + (1 | year),
@@ -101,3 +103,24 @@ print(AIC(full_model))
 mse <- mean(residuals(full_model)^2, na.rm = TRUE)
 print(mse)
 ```
+```{r}
+# From the fitted model:
+smry <- summary(full_model)$coefficients  # matrix: Estimate, Std. Error, t value
+est  <- smry[, "Estimate"]
+se   <- smry[, "Std. Error"]
+
+# You can use z = 1.96 (large-sample) or a t with an approximate df if you prefer
+z <- 1.96
+# Or: df <- nrow(data) - length(fixef(full_model)); z <- qt(0.975, df)
+
+ci_fixed_wald <- data.frame(
+  term     = rownames(smry),
+  estimate = est,
+  std.error= se,
+  lower95  = est - z * se,
+  upper95  = est + z * se,
+  t.value  = smry[, "t value"]
+)
+ci_fixed_wald
+```
+

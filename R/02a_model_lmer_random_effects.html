@@ -11,7 +11,7 @@
 
 
 
-<title>GAMM Model for Mixed + Spatial effects (mgcv)</title>
+<title>Random Effect Model (lmer)</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1619,8 +1619,7 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">GAMM Model for Mixed + Spatial effects
-(mgcv)</h1>
+<h1 class="title toc-ignore">Random Effect Model (lmer)</h1>
 
 </div>
 
@@ -1628,14 +1627,32 @@ display: none;
 <div id="setup" class="section level2">
 <h2>Setup</h2>
 <pre class="r"><code># --- Setup
-if (!require(mgcv)) {
-  install.packages(&quot;mgcv&quot;)
-  library(mgcv)
-}</code></pre>
-<pre><code>## Loading required package: mgcv</code></pre>
-<pre><code>## Loading required package: nlme</code></pre>
-<pre><code>## This is mgcv 1.9-1. For overview type &#39;help(&quot;mgcv-package&quot;)&#39;.</code></pre>
-<pre class="r"><code># Input/output folder paths
+library(tidyverse)</code></pre>
+<pre><code>## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+## ✔ dplyr     1.1.4     ✔ readr     2.1.5
+## ✔ forcats   1.0.0     ✔ stringr   1.5.1
+## ✔ ggplot2   3.5.2     ✔ tibble    3.2.1
+## ✔ lubridate 1.9.4     ✔ tidyr     1.3.1
+## ✔ purrr     1.0.4     
+## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()
+## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
+<pre class="r"><code>library(lme4)</code></pre>
+<pre><code>## Loading required package: Matrix
+## 
+## Attaching package: &#39;Matrix&#39;
+## 
+## The following objects are masked from &#39;package:tidyr&#39;:
+## 
+##     expand, pack, unpack</code></pre>
+<pre class="r"><code># Optional: for ICC calculation
+if (!require(performance)) install.packages(&quot;performance&quot;)</code></pre>
+<pre><code>## Loading required package: performance</code></pre>
+<pre class="r"><code>library(performance)
+
+
+# Input/output folder paths
 RAW_DATA_DIR &lt;- &quot;../data/raw/&quot;
 INTERIM_DATA_DIR &lt;- &quot;../data/interim/&quot;
 PROCESSED_DATA_DIR &lt;- &quot;../data/processed/&quot;</code></pre>
@@ -1684,136 +1701,146 @@ numeric_vars &lt;- c(
 # Scale each numeric variable if it exists in data
 for (v in numeric_vars) {
   if (v %in% names(data)) data[[v]] &lt;- scale(data[[v]])
-}
-
-data$farm &lt;- as.factor(data$farm)
-data$year &lt;- as.factor(data$year)</code></pre>
+}</code></pre>
+<div id="how-many-fields-has-crop-type---potato" class="section level3">
+<h3>How many fields has crop type - potato</h3>
+<pre class="r"><code>nrow(data[data[&#39;croptype&#39;]==1,])</code></pre>
+<pre><code>## [1] 2994</code></pre>
 </div>
-<div id="fit-gam-with-spatial-smoothing" class="section level2">
-<h2>Fit GAM with Spatial Smoothing</h2>
-<pre class="r"><code>gam_model &lt;- gam(cpb_abundance ~ s(lat, lng) + s(year, bs = &quot;re&quot;) + s(farm, bs = &quot;re&quot;) +
-                  gdd + cum_gdd  + wei_intensity + wei_prop + summer_avg_temp + 
-                  summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
-                  winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count,
-                  data = data, family = gaussian())
-
-# Print the model summary and AIC
-summary(gam_model)</code></pre>
-<pre><code>## 
-## Family: gaussian 
-## Link function: identity 
-## 
-## Formula:
-## cpb_abundance ~ s(lat, lng) + s(year, bs = &quot;re&quot;) + s(farm, bs = &quot;re&quot;) + 
-##     gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
-##     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
-##     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count
-## 
-## Parametric coefficients:
-##                             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)                 3.459443   0.318914  10.848  &lt; 2e-16 ***
-## gdd                        -0.023890   0.032627  -0.732  0.46408    
-## cum_gdd                     0.094061   0.031100   3.024  0.00251 ** 
-## wei_intensity               0.225144   0.037697   5.973 2.59e-09 ***
-## wei_prop                    0.041508   0.027669   1.500  0.13367    
-## summer_avg_temp            -0.073349   0.063791  -1.150  0.25030    
-## summer_avg_percip          -0.026753   0.033164  -0.807  0.41990    
-## summer_heavy_rainfall_days -0.085692   0.037982  -2.256  0.02413 *  
-## summer_hottest_temp         0.071633   0.061311   1.168  0.24275    
-## winter_coldest_temp         0.182356   0.068714   2.654  0.00800 ** 
-## winter_extreme_cold_days   -0.006486   0.058574  -0.111  0.91184    
-## winter_warm_day_count      -0.096136   0.057822  -1.663  0.09649 .  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Approximate significance of smooth terms:
-##               edf Ref.df      F p-value    
-## s(lat,lng) 11.123  15.31 11.551  &lt;2e-16 ***
-## s(year)     9.777  10.00 54.220  &lt;2e-16 ***
-## s(farm)    48.929  56.00  5.973  &lt;2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## R-sq.(adj) =  0.344   Deviance explained =   36%
-## GCV = 2.0448  Scale est. = 1.9935    n = 3266</code></pre>
-<pre class="r"><code>cat(&quot;AIC:&quot;, AIC(gam_model), &quot;\n&quot;)</code></pre>
-<pre><code>## AIC: 11604.53</code></pre>
-<pre class="r"><code>res &lt;- residuals(gam_model)
-mse &lt;- mean(res^2)
-print(mse)</code></pre>
-<pre><code>## [1] 1.943586</code></pre>
-<pre class="r"><code># grab the summary table
-s  &lt;- summary(gam_model)$p.table
-est &lt;- s[, &quot;Estimate&quot;]
-se  &lt;- s[, &quot;Std. Error&quot;]
-
-# residual degrees of freedom
-df  &lt;- df.residual(gam_model)
-
-# 97.5th‐percentile t‐value
-t  &lt;- qt(0.975, df)
-
-# assemble a matrix of CIs
-CI_gam  &lt;- data.frame(
-  Estimate = est,
-  Lower95  = est - t * se,
-  Upper95  = est + t * se
-)
-CI_gam</code></pre>
+</div>
+<div id="random-effects-testing" class="section level2">
+<h2>Random effects testing</h2>
+<pre class="r"><code># (a) Null vs. farm random effect
+model_null  &lt;- lm(cpb_abundance ~ 1, data = data)
+model_farm  &lt;- lmer(cpb_abundance ~ 1 + (1 | farm), data = data, REML = TRUE)
+anova(model_farm,model_null)</code></pre>
+<pre><code>## refitting model(s) with ML (instead of REML)</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Estimate"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["Lower95"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Upper95"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"3.459443190","2":"2.83414574","3":"4.08474064","_rn_":"(Intercept)"},{"1":"-0.023890239","2":"-0.08786206","3":"0.04008158","_rn_":"gdd"},{"1":"0.094061013","2":"0.03308221","3":"0.15503981","_rn_":"cum_gdd"},{"1":"0.225144127","2":"0.15123179","3":"0.29905647","_rn_":"wei_intensity"},{"1":"0.041508243","2":"-0.01274211","3":"0.09575859","_rn_":"wei_prop"},{"1":"-0.073348902","2":"-0.19842543","3":"0.05172763","_rn_":"summer_avg_temp"},{"1":"-0.026753500","2":"-0.09177809","3":"0.03827109","_rn_":"summer_avg_percip"},{"1":"-0.085692026","2":"-0.16016342","3":"-0.01122063","_rn_":"summer_heavy_rainfall_days"},{"1":"0.071632511","2":"-0.04858059","3":"0.19184561","_rn_":"summer_hottest_temp"},{"1":"0.182356206","2":"0.04762722","3":"0.31708519","_rn_":"winter_coldest_temp"},{"1":"-0.006485623","2":"-0.12133239","3":"0.10836114","_rn_":"winter_extreme_cold_days"},{"1":"-0.096136389","2":"-0.20950845","3":"0.01723568","_rn_":"winter_warm_day_count"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["npar"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["AIC"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["BIC"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["logLik"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["-2*log(L)"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["Chisq"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["Df"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["Pr(>Chisq)"],"name":[8],"type":["dbl"],"align":["right"]}],"data":[{"1":"2","2":"12900.97","3":"12913.15","4":"-6448.486","5":"12896.97","6":"NA","7":"NA","8":"NA","_rn_":"model_null"},{"1":"3","2":"12524.79","3":"12543.07","4":"-6259.397","5":"12518.79","6":"378.178","7":"1","8":"3.101944e-84","_rn_":"model_farm"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
+<pre class="r"><code># (b) Farm vs. farm+year random effects
+model_farm_year &lt;- lmer(cpb_abundance ~ 1 + (1 | farm) + (1 | year), data = data, REML = TRUE)
+anova(model_farm, model_farm_year)</code></pre>
+<pre><code>## refitting model(s) with ML (instead of REML)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["npar"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["AIC"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["BIC"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["logLik"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["-2*log(L)"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["Chisq"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["Df"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["Pr(>Chisq)"],"name":[8],"type":["dbl"],"align":["right"]}],"data":[{"1":"3","2":"12524.79","3":"12543.07","4":"-6259.397","5":"12518.79","6":"NA","7":"NA","8":"NA","_rn_":"model_farm"},{"1":"4","2":"11979.88","3":"12004.24","4":"-5985.938","5":"11971.88","6":"546.9182","7":"1","8":"5.893928e-121","_rn_":"model_farm_year"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
 </div>
-<div id="si-plots-gam-smooths-re-caterpillars-from-the-mgcv-gam" class="section level2">
-<h2>SI PLOTS: GAM smooths + RE caterpillars (from the mgcv GAM)</h2>
-<pre class="r"><code># Make sure these are loaded
-if (!requireNamespace(&quot;gratia&quot;, quietly = TRUE)) install.packages(&quot;gratia&quot;)
-if (!requireNamespace(&quot;patchwork&quot;, quietly = TRUE)) install.packages(&quot;patchwork&quot;)
-library(gratia)
-library(ggplot2)
-library(patchwork)
-
-# (Re)create the three panels (no harm if they already exist)
-labs &lt;- gratia::smooths(gam_model)
-idx_space &lt;- which(grepl(&quot;^s\\(lat,\\s*lng\\)$&quot;, labs))
-idx_year  &lt;- which(grepl(&quot;^s\\(year\\)$&quot;, labs))
-idx_farm  &lt;- which(grepl(&quot;^s\\(farm\\)$&quot;, labs))
-
-stopifnot(length(idx_space)==1, length(idx_year)==1, length(idx_farm)==1)
-
-p_space &lt;- gratia::draw(gam_model, select = idx_space, residuals = FALSE) +
-  ggtitle(&quot;Spatial smooth: s(lat, lng)&quot;)
-p_year  &lt;- gratia::draw(gam_model, select = idx_year,  residuals = FALSE) +
-  ggtitle(&quot;Random effect: s(year)&quot;)
-p_farm  &lt;- gratia::draw(gam_model, select = idx_farm,  residuals = FALSE) +
-  ggtitle(&quot;Random effect: s(farm)&quot;)
-
-# Save the individual panels (already worked for you, but keeping for completeness)
-ggsave(&quot;../fig/FigS1a_GAM_spatial_smooth.png&quot;, p_space, width = 6.5, height = 5.5, dpi = 300)
-ggsave(&quot;../fig/FigS1b_GAM_RE_year.png&quot;,        p_year,  width = 6.0, height = 6.5, dpi = 300)
-ggsave(&quot;../fig/FigS1c_GAM_RE_farm.png&quot;,        p_farm,  width = 6.0, height = 10.0, dpi = 300)
-
-# Use a design so p_space spans the top row; year and farm sit below (two columns)
-# Layout (2 cols):
-# Row1: C C  (p_space across both columns)
-# Row2: A B  (p_year, p_farm)
-design &lt;- &quot;
-CC
-AB
-&quot;
-
-figS1_combined &lt;- patchwork::wrap_plots(
-  A = p_year,
-  B = p_farm,
-  C = p_space,
-  design = design,
-  guides = &quot;collect&quot;
+<pre class="r"><code># --- Full mixed-effects model
+full_model &lt;- lmer(
+  cpb_abundance ~ gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
+    summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
+    winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
+    (1 | farm) + (1 | year),
+  data = data, REML = TRUE
 )
 
-ggsave(&quot;../fig/FigS1_GAM_smooths_combined.png&quot;, figS1_combined,
-       width = 10, height = 10, dpi = 300)</code></pre>
+summary(full_model)</code></pre>
+<pre><code>## Linear mixed model fit by REML [&#39;lmerMod&#39;]
+## Formula: 
+## cpb_abundance ~ gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp +  
+##     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp +  
+##     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +  
+##     (1 | farm) + (1 | year)
+##    Data: data
+## 
+## REML criterion at convergence: 11926.5
+## 
+## Scaled residuals: 
+##     Min      1Q  Median      3Q     Max 
+## -2.8527 -0.6793 -0.0978  0.5914  4.1996 
+## 
+## Random effects:
+##  Groups   Name        Variance Std.Dev.
+##  farm     (Intercept) 0.8308   0.9115  
+##  year     (Intercept) 0.6596   0.8122  
+##  Residual             2.1075   1.4517  
+## Number of obs: 3266, groups:  farm, 57; year, 11
+## 
+## Fixed effects:
+##                             Estimate Std. Error t value
+## (Intercept)                 3.506348   0.278648  12.583
+## gdd                        -0.001413   0.032624  -0.043
+## cum_gdd                     0.084912   0.031484   2.697
+## wei_intensity               0.285732   0.034078   8.385
+## wei_prop                    0.053289   0.028258   1.886
+## summer_avg_temp            -0.075184   0.062910  -1.195
+## summer_avg_percip          -0.027126   0.032387  -0.838
+## summer_heavy_rainfall_days -0.028943   0.037996  -0.762
+## summer_hottest_temp         0.032630   0.061849   0.528
+## winter_coldest_temp         0.081591   0.066613   1.225
+## winter_extreme_cold_days    0.025979   0.057300   0.453
+## winter_warm_day_count      -0.058955   0.057901  -1.018
+## 
+## Correlation of Fixed Effects:
+##             (Intr) gdd    cm_gdd w_ntns we_prp smmr_vg_t smmr_vg_p smm___
+## gdd          0.012                                                       
+## cum_gdd      0.011 -0.128                                                
+## wei_intnsty  0.013  0.033 -0.013                                         
+## wei_prop     0.019 -0.031 -0.032 -0.179                                  
+## smmr_vg_tmp -0.001 -0.081 -0.056  0.012  0.037                           
+## smmr_vg_prc  0.002 -0.035 -0.021  0.020 -0.009  0.110                    
+## smmr_hvy_r_  0.010 -0.034  0.018  0.006  0.016 -0.054    -0.127          
+## smmr_httst_  0.012  0.003  0.026 -0.031 -0.018 -0.565    -0.056     0.104
+## wntr_cldst_ -0.015  0.047  0.007  0.114  0.013 -0.241    -0.080    -0.166
+## wntr_xtrm__ -0.011  0.041 -0.011  0.053  0.031  0.259    -0.074     0.075
+## wntr_wrm_d_ -0.013 -0.022  0.007  0.008  0.000 -0.086    -0.055     0.091
+##             smmr_h_ wntr__ wntr_x__
+## gdd                                
+## cum_gdd                            
+## wei_intnsty                        
+## wei_prop                           
+## smmr_vg_tmp                        
+## smmr_vg_prc                        
+## smmr_hvy_r_                        
+## smmr_httst_                        
+## wntr_cldst_ -0.078                 
+## wntr_xtrm__ -0.151   0.278         
+## wntr_wrm_d_  0.178  -0.207  0.241</code></pre>
+<pre class="r"><code>df_exact &lt;- 3266 - 17
+qt(0.975, df_exact)  # e.g. ~1.96</code></pre>
+<pre><code>## [1] 1.960694</code></pre>
+<pre class="r"><code># --- Variance explained by random effects (ICC)
+#icc_val &lt;- performance::icc(full_model)
+#print(icc_val)
+r2_vals &lt;- performance::r2(full_model)
+print(r2_vals)</code></pre>
+<pre><code>## # R2 for Mixed Models
+## 
+##   Conditional R2: 0.432
+##      Marginal R2: 0.030</code></pre>
+<pre class="r"><code># --- AIC and Mean Squared Error
+print(AIC(full_model))</code></pre>
+<pre><code>## [1] 11956.53</code></pre>
+<pre class="r"><code>mse &lt;- mean(residuals(full_model)^2, na.rm = TRUE)
+print(mse)</code></pre>
+<pre><code>## [1] 2.063458</code></pre>
+<pre class="r"><code># From the fitted model:
+smry &lt;- summary(full_model)$coefficients  # matrix: Estimate, Std. Error, t value
+est  &lt;- smry[, &quot;Estimate&quot;]
+se   &lt;- smry[, &quot;Std. Error&quot;]
+
+# You can use z = 1.96 (large-sample) or a t with an approximate df if you prefer
+z &lt;- 1.96
+# Or: df &lt;- nrow(data) - length(fixef(full_model)); z &lt;- qt(0.975, df)
+
+ci_fixed_wald &lt;- data.frame(
+  term     = rownames(smry),
+  estimate = est,
+  std.error= se,
+  lower95  = est - z * se,
+  upper95  = est + z * se,
+  t.value  = smry[, &quot;t value&quot;]
+)
+ci_fixed_wald</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["term"],"name":[1],"type":["chr"],"align":["left"]},{"label":["estimate"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["std.error"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["lower95"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["upper95"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["t.value"],"name":[6],"type":["dbl"],"align":["right"]}],"data":[{"1":"(Intercept)","2":"3.506347672","3":"0.27864760","4":"2.960198368","5":"4.05249698","6":"12.58344813","_rn_":"(Intercept)"},{"1":"gdd","2":"-0.001412676","3":"0.03262375","4":"-0.065355231","5":"0.06252988","6":"-0.04330206","_rn_":"gdd"},{"1":"cum_gdd","2":"0.084912321","3":"0.03148448","4":"0.023202746","5":"0.14662190","6":"2.69695829","_rn_":"cum_gdd"},{"1":"wei_intensity","2":"0.285731721","3":"0.03407807","4":"0.218938713","5":"0.35252473","6":"8.38462270","_rn_":"wei_intensity"},{"1":"wei_prop","2":"0.053289414","3":"0.02825842","4":"-0.002097089","5":"0.10867592","6":"1.88578886","_rn_":"wei_prop"},{"1":"summer_avg_temp","2":"-0.075184239","3":"0.06291014","4":"-0.198488106","5":"0.04811963","6":"-1.19510533","_rn_":"summer_avg_temp"},{"1":"summer_avg_percip","2":"-0.027125801","3":"0.03238710","4":"-0.090604519","5":"0.03635292","6":"-0.83754954","_rn_":"summer_avg_percip"},{"1":"summer_heavy_rainfall_days","2":"-0.028942912","3":"0.03799587","4":"-0.103414812","5":"0.04552899","6":"-0.76173843","_rn_":"summer_heavy_rainfall_days"},{"1":"summer_hottest_temp","2":"0.032630356","3":"0.06184941","4":"-0.088594484","5":"0.15385519","6":"0.52757749","_rn_":"summer_hottest_temp"},{"1":"winter_coldest_temp","2":"0.081591191","3":"0.06661267","4":"-0.048969649","5":"0.21215203","6":"1.22485988","_rn_":"winter_coldest_temp"},{"1":"winter_extreme_cold_days","2":"0.025979131","3":"0.05729990","4":"-0.086328675","5":"0.13828694","6":"0.45338876","_rn_":"winter_extreme_cold_days"},{"1":"winter_warm_day_count","2":"-0.058955242","3":"0.05790104","4":"-0.172441282","5":"0.05453080","6":"-1.01820694","_rn_":"winter_warm_day_count"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
 </div>
 
 

@@ -1,0 +1,181 @@
+---
+title: "Risk-map model (reduced spaMM) — comparison"
+output:
+  html_document:
+    df_print: paged
+---
+
+### Model selection for risk mapping
+
+In this section, we test alternative spatial mixed-effects models (spaMM) to identify the most appropriate specification for generating a statewide risk map of Colorado potato beetle (CPB) abundance in Wisconsin.
+
+```{r}
+# ---- Libraries ----
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(lme4)
+  if (!require(performance)) install.packages("performance")
+  library(performance)
+})
+
+# spaMM (use Lyon mirror which hosts spaMM if CRAN fails)
+if (!require(spaMM)) {
+  install.packages("spaMM", repos = "https://pbil.univ-lyon1.fr/CRAN/")
+  library(spaMM)
+}
+
+theme_set(theme_bw())
+```
+
+### Data & paths
+
+```{r}
+# ---- Paths ----
+RAW_DATA_DIR       <- "../data/raw/"
+INTERIM_DATA_DIR   <- "../data/interim/"
+PROCESSED_DATA_DIR <- "../data/processed/"
+MODEL_DIR          <- "../models"
+
+# ---- Load processed modeling data ----
+data <- read.csv(file.path(PROCESSED_DATA_DIR, "final_data_for_modeling.csv"))
+dim(data)
+```
+
+```{r}
+# ---- Target + scaling ----
+
+# Average CPB abundance (adult + larval)
+data$cpb_abundance <- (data$cpba_count + data$cpbl_count) / 2
+
+numeric_vars <- c(
+  "gdd","cum_gdd","wei_intensity","wei_prop",
+  "summer_avg_temp","summer_avg_percip","summer_heavy_rainfall_days",
+  "summer_hottest_temp","summer_temp_variability",
+  "winter_coldest_temp","winter_extreme_cold_days","winter_warm_day_count"
+)
+
+for (v in numeric_vars) {
+  if (v %in% names(data)) data[[v]] <- scale(data[[v]])
+}
+
+# If any columns are matrices (can happen after scale()), coerce to numeric
+matrix_vars <- names(data)[sapply(data, is.matrix)]
+for (v in matrix_vars) data[[v]] <- as.numeric(data[[v]])
+```
+
+### Model formulas
+
+```{r}
+# ---- Full model: all screened predictors ----
+
+form_full <-
+  cpb_abundance ~
+    gdd + cum_gdd + croptype + wei_intensity + wei_prop +
+    summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days +
+    summer_hottest_temp +
+    winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
+    Matern(1 | lat + lng) + (1 | year) + (1 | farm)
+
+# ---- Reduced (significant only) WITH farm ----
+form_sig_RE <-
+  cpb_abundance ~
+    cum_gdd + wei_intensity + summer_heavy_rainfall_days + winter_coldest_temp +
+    Matern(1 | lat + lng) + (1 | year) + (1 | farm)
+
+# ---- Reduced (significant only) WITHOUT farm ----
+form_sig_noFarm <-
+  cpb_abundance ~
+    cum_gdd + wei_intensity + summer_heavy_rainfall_days + winter_coldest_temp +
+    Matern(1 | lat + lng) + (1 | year)
+```
+
+### Fit the three spaMM models
+
+```{r}
+set.seed(123)
+
+spaMM_full       <- fitme(form_full,       data = data, family = gaussian())
+spaMM_sig_RE     <- fitme(form_sig_RE,     data = data, family = gaussian())
+spaMM_sig_noFarm <- fitme(form_sig_noFarm, data = data, family = gaussian())
+
+# Quick summaries 
+summary(spaMM_full)
+summary(spaMM_sig_RE)
+summary(spaMM_sig_noFarm)
+```
+
+### Metrics helper
+
+```{r}
+metrics_spaMM <- function(mod, name) {
+  # AIC
+  aic <- AIC(mod)
+
+  # MSE from residuals
+  mse <- mean(residuals(mod)^2)
+
+  # Variance components:
+  # - fixed part via variance of fitted values (consistent with prior workflow)
+  var_fixed <- var(predict(mod))
+
+  # Random components pulled from spaMM internals
+  lam <- unname(mod$lambda)
+  nm  <- names(mod$lambda)
+
+  v_spatial <- if ("lat + lng" %in% nm) unname(mod$lambda["lat + lng"]) else 0
+  v_year    <- if ("year"      %in% nm) unname(mod$lambda["year"])      else 0
+  v_farm    <- if ("farm"      %in% nm) unname(mod$lambda["farm"])      else 0
+
+  v_resid   <- unname(mod$phi)
+
+  # R2 (Nakagawa-style; same logic you used)
+  denom <- (var_fixed + v_spatial + v_year + v_farm + v_resid)
+  r2m   <- var_fixed / denom
+  r2c   <- (var_fixed + v_spatial + v_year + v_farm) / denom
+
+  tibble(
+    model = name,
+    AIC   = as.numeric(aic),
+    MSE   = as.numeric(mse),
+    R2_marginal    = as.numeric(r2m),
+    R2_conditional = as.numeric(r2c)
+  )
+}
+```
+
+### Compare performance
+
+```{r}
+cmp <- bind_rows(
+  metrics_spaMM(spaMM_full,       "spaMM_full (all predictors + year + farm + Matérn)"),
+  metrics_spaMM(spaMM_sig_RE,     "spaMM_sig_RE (signif. predictors + year + farm + Matérn)"),
+  metrics_spaMM(spaMM_sig_noFarm, "spaMM_sig_noFarm (signif. predictors + year + Matérn)")
+) %>%
+  mutate(
+    AIC = round(AIC, 1),
+    MSE = round(MSE, 3),
+    R2_marginal = round(R2_marginal, 3),
+    R2_conditional = round(R2_conditional, 3)
+  )
+```
+
+### Model comparisons
+
+We compared three candidate spaMM models:
+
+1.  **Full spaMM model** including all screened predictors, year and farm random effects, and a Matérn spatial correlation term.\
+2.  **Reduced spaMM model** including only statistically significant predictors (cumulative GDD, weighted potato intensity, heavy rainfall days, and winter coldest-day temperature) together with year and farm random effects.\
+3.  **Reduced spaMM without farm random effect**, designed to match the prediction grid where farm identifiers are not available.
+
+All three models performed similarly in terms of predictive accuracy. The reduced specification with only significant predictors achieved nearly identical fit to the full model (slightly lower AIC, comparable $R^2$ values), demonstrating that unnecessary variables could be omitted without loss of performance. The no-farm model showed modestly lower conditional $R^2$, but remained stable and interpretable, making it appropriate for statewide mapping where grid cells are treated independently of farm identity.
+
+### Performance results
+
+```{r}
+cmp[c(2, 6, 10), ]
+```
+
+### Conclusion
+
+Given the similar performance of the full and reduced models, and the practical need to omit farm-level effects for grid-based prediction, we adopt the **reduced spaMM without farm effect** as the final model for generating the Wisconsin CPB risk map. This specification balances parsimony, stability, and predictive accuracy, while avoiding overfitting to local farm-level variation that cannot be projected statewide.

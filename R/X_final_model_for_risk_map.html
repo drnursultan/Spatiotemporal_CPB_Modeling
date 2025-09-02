@@ -11,7 +11,7 @@
 
 
 
-<title>GAMM Model for Mixed + Spatial effects (mgcv)</title>
+<title>Risk-map model (reduced spaMM) — comparison</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1619,201 +1619,309 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">GAMM Model for Mixed + Spatial effects
-(mgcv)</h1>
+<h1 class="title toc-ignore">Risk-map model (reduced spaMM) —
+comparison</h1>
 
 </div>
 
 
-<div id="setup" class="section level2">
-<h2>Setup</h2>
-<pre class="r"><code># --- Setup
-if (!require(mgcv)) {
-  install.packages(&quot;mgcv&quot;)
-  library(mgcv)
+<div id="model-selection-for-risk-mapping" class="section level3">
+<h3>Model selection for risk mapping</h3>
+<p>In this section, we test alternative spatial mixed-effects models
+(spaMM) to identify the most appropriate specification for generating a
+statewide risk map of Colorado potato beetle (CPB) abundance in
+Wisconsin.</p>
+<pre class="r"><code># ---- Libraries ----
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(lme4)
+  if (!require(performance)) install.packages(&quot;performance&quot;)
+  library(performance)
+})
+
+# spaMM (use Lyon mirror which hosts spaMM if CRAN fails)
+if (!require(spaMM)) {
+  install.packages(&quot;spaMM&quot;, repos = &quot;https://pbil.univ-lyon1.fr/CRAN/&quot;)
+  library(spaMM)
 }</code></pre>
-<pre><code>## Loading required package: mgcv</code></pre>
-<pre><code>## Loading required package: nlme</code></pre>
-<pre><code>## This is mgcv 1.9-1. For overview type &#39;help(&quot;mgcv-package&quot;)&#39;.</code></pre>
-<pre class="r"><code># Input/output folder paths
-RAW_DATA_DIR &lt;- &quot;../data/raw/&quot;
-INTERIM_DATA_DIR &lt;- &quot;../data/interim/&quot;
-PROCESSED_DATA_DIR &lt;- &quot;../data/processed/&quot;</code></pre>
-<pre class="r"><code>data &lt;- read.csv(file.path(PROCESSED_DATA_DIR, &#39;final_data_for_modeling.csv&#39;))
-print(dim(data))</code></pre>
+<pre><code>## Loading required package: spaMM</code></pre>
+<pre><code>## Registered S3 methods overwritten by &#39;registry&#39;:
+##   method               from 
+##   print.registry_field proxy
+##   print.registry_entry proxy</code></pre>
+<pre><code>## spaMM (Rousset &amp; Ferdy, 2014, version 4.5.0) is loaded.
+## Type &#39;help(spaMM)&#39; for a short introduction,
+## &#39;news(package=&#39;spaMM&#39;)&#39; for news,
+## and &#39;citation(&#39;spaMM&#39;)&#39; for proper citation.
+## Further infos, slides, etc. at https://gitlab.mbb.univ-montp2.fr/francois/spamm-ref.</code></pre>
+<pre class="r"><code>theme_set(theme_bw())</code></pre>
+</div>
+<div id="data-paths" class="section level3">
+<h3>Data &amp; paths</h3>
+<pre class="r"><code># ---- Paths ----
+RAW_DATA_DIR       &lt;- &quot;../data/raw/&quot;
+INTERIM_DATA_DIR   &lt;- &quot;../data/interim/&quot;
+PROCESSED_DATA_DIR &lt;- &quot;../data/processed/&quot;
+MODEL_DIR          &lt;- &quot;../models&quot;
+
+# ---- Load processed modeling data ----
+data &lt;- read.csv(file.path(PROCESSED_DATA_DIR, &quot;final_data_for_modeling.csv&quot;))
+dim(data)</code></pre>
 <pre><code>## [1] 3266   27</code></pre>
-<pre class="r"><code>print(head(data, 3))</code></pre>
-<pre><code>##                    grower farm          field field_fvid      lat       lng
-## 1 Wisconsin Central Farms  WCF      1 Necedah      62992 44.05716 -90.04041
-## 2 Wisconsin Central Farms  WCF 13 Nepco N 1/2      62996 44.20941 -90.02138
-## 3 Wisconsin Central Farms  WCF     16 13th St      62999 44.10078 -90.05052
-##   year      gdd cpba_count cpba_value cpbl_count cpbl_value  cum_gdd croptype
-## 1 2014 13.77211   3.307692   3.307692   3.900000       3.90 1727.896       43
-## 2 2014 12.80405   4.562500   4.500000   8.714286       8.50 1258.997        1
-## 3 2014 14.26358   1.637500   1.781818   2.190000       2.19 1688.067       43
-##    wei_prop wei_intensity summer_avg_temp summer_hottest_temp summer_avg_percip
-## 1 0.4666667    0.03342508        18.29008                31.0          3.366667
-## 2 0.1333333    0.09345027        18.62705                31.1          1.473810
-## 3 0.4666667    0.07448554        18.34228                31.0          1.473810
-##   summer_heavy_rainfall_days summer_temp_variability winter_coldest_temp
-## 1                          0                4.000550               -30.9
-## 2                          1                4.098317               -31.1
-## 3                          1                3.989022               -30.9
-##   winter_heavy_rainfall_days winter_temp_variability winter_warm_day_count
-## 1                          0                6.345407                     0
-## 2                          0                6.696421                     0
-## 3                          0                6.668776                     0
-##   winter_extreme_cold_days spring_frost_free_days
-## 1                       58                      8
-## 2                       54                      5
-## 3                       59                      8</code></pre>
-<pre class="r"><code># Create target: average CPB abundance
+<pre class="r"><code># ---- Target + scaling ----
+
+# Average CPB abundance (adult + larval)
 data$cpb_abundance &lt;- (data$cpba_count + data$cpbl_count) / 2
-data$croptype &lt;- ifelse(data$croptype == 43, 1, 0)
 
-
-# --- Scale numeric predictors
 numeric_vars &lt;- c(
-  &quot;gdd&quot;, &quot;cum_gdd&quot;, &quot;wei_intensity&quot;, &quot;wei_prop&quot;,
-  &quot;summer_avg_temp&quot;, &quot;summer_avg_percip&quot;, &quot;summer_heavy_rainfall_days&quot;,
-  &quot;summer_hottest_temp&quot;,&quot;summer_temp_variability&quot;, &quot;winter_coldest_temp&quot;,
-  &quot;winter_extreme_cold_days&quot;, &quot;winter_temp_variability&quot;,
-  &quot;winter_warm_day_count&quot;,&quot;winter_heavy_rainfall_days&quot;,  &quot;spring_frost_free_days&quot;
+  &quot;gdd&quot;,&quot;cum_gdd&quot;,&quot;wei_intensity&quot;,&quot;wei_prop&quot;,
+  &quot;summer_avg_temp&quot;,&quot;summer_avg_percip&quot;,&quot;summer_heavy_rainfall_days&quot;,
+  &quot;summer_hottest_temp&quot;,&quot;summer_temp_variability&quot;,
+  &quot;winter_coldest_temp&quot;,&quot;winter_extreme_cold_days&quot;,&quot;winter_warm_day_count&quot;
 )
 
-# Scale each numeric variable if it exists in data
 for (v in numeric_vars) {
   if (v %in% names(data)) data[[v]] &lt;- scale(data[[v]])
 }
 
-data$farm &lt;- as.factor(data$farm)
-data$year &lt;- as.factor(data$year)</code></pre>
+# If any columns are matrices (can happen after scale()), coerce to numeric
+matrix_vars &lt;- names(data)[sapply(data, is.matrix)]
+for (v in matrix_vars) data[[v]] &lt;- as.numeric(data[[v]])</code></pre>
 </div>
-<div id="fit-gam-with-spatial-smoothing" class="section level2">
-<h2>Fit GAM with Spatial Smoothing</h2>
-<pre class="r"><code>gam_model &lt;- gam(cpb_abundance ~ s(lat, lng) + s(year, bs = &quot;re&quot;) + s(farm, bs = &quot;re&quot;) +
-                  gdd + cum_gdd  + wei_intensity + wei_prop + summer_avg_temp + 
-                  summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
-                  winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count,
-                  data = data, family = gaussian())
+<div id="model-formulas" class="section level3">
+<h3>Model formulas</h3>
+<pre class="r"><code># ---- Full model: all screened predictors ----
 
-# Print the model summary and AIC
-summary(gam_model)</code></pre>
-<pre><code>## 
-## Family: gaussian 
-## Link function: identity 
-## 
-## Formula:
-## cpb_abundance ~ s(lat, lng) + s(year, bs = &quot;re&quot;) + s(farm, bs = &quot;re&quot;) + 
-##     gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
-##     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
-##     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count
-## 
-## Parametric coefficients:
-##                             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)                 3.459443   0.318914  10.848  &lt; 2e-16 ***
-## gdd                        -0.023890   0.032627  -0.732  0.46408    
-## cum_gdd                     0.094061   0.031100   3.024  0.00251 ** 
-## wei_intensity               0.225144   0.037697   5.973 2.59e-09 ***
-## wei_prop                    0.041508   0.027669   1.500  0.13367    
-## summer_avg_temp            -0.073349   0.063791  -1.150  0.25030    
-## summer_avg_percip          -0.026753   0.033164  -0.807  0.41990    
-## summer_heavy_rainfall_days -0.085692   0.037982  -2.256  0.02413 *  
-## summer_hottest_temp         0.071633   0.061311   1.168  0.24275    
-## winter_coldest_temp         0.182356   0.068714   2.654  0.00800 ** 
-## winter_extreme_cold_days   -0.006486   0.058574  -0.111  0.91184    
-## winter_warm_day_count      -0.096136   0.057822  -1.663  0.09649 .  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Approximate significance of smooth terms:
-##               edf Ref.df      F p-value    
-## s(lat,lng) 11.123  15.31 11.551  &lt;2e-16 ***
-## s(year)     9.777  10.00 54.220  &lt;2e-16 ***
-## s(farm)    48.929  56.00  5.973  &lt;2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## R-sq.(adj) =  0.344   Deviance explained =   36%
-## GCV = 2.0448  Scale est. = 1.9935    n = 3266</code></pre>
-<pre class="r"><code>cat(&quot;AIC:&quot;, AIC(gam_model), &quot;\n&quot;)</code></pre>
-<pre><code>## AIC: 11604.53</code></pre>
-<pre class="r"><code>res &lt;- residuals(gam_model)
-mse &lt;- mean(res^2)
-print(mse)</code></pre>
-<pre><code>## [1] 1.943586</code></pre>
-<pre class="r"><code># grab the summary table
-s  &lt;- summary(gam_model)$p.table
-est &lt;- s[, &quot;Estimate&quot;]
-se  &lt;- s[, &quot;Std. Error&quot;]
+form_full &lt;-
+  cpb_abundance ~
+    gdd + cum_gdd + croptype + wei_intensity + wei_prop +
+    summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days +
+    summer_hottest_temp +
+    winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
+    Matern(1 | lat + lng) + (1 | year) + (1 | farm)
 
-# residual degrees of freedom
-df  &lt;- df.residual(gam_model)
+# ---- Reduced (significant only) WITH farm ----
+form_sig_RE &lt;-
+  cpb_abundance ~
+    cum_gdd + wei_intensity + summer_heavy_rainfall_days + winter_coldest_temp +
+    Matern(1 | lat + lng) + (1 | year) + (1 | farm)
 
-# 97.5th‐percentile t‐value
-t  &lt;- qt(0.975, df)
+# ---- Reduced (significant only) WITHOUT farm ----
+form_sig_noFarm &lt;-
+  cpb_abundance ~
+    cum_gdd + wei_intensity + summer_heavy_rainfall_days + winter_coldest_temp +
+    Matern(1 | lat + lng) + (1 | year)</code></pre>
+</div>
+<div id="fit-the-three-spamm-models" class="section level3">
+<h3>Fit the three spaMM models</h3>
+<pre class="r"><code>set.seed(123)
 
-# assemble a matrix of CIs
-CI_gam  &lt;- data.frame(
-  Estimate = est,
-  Lower95  = est - t * se,
-  Upper95  = est + t * se
-)
-CI_gam</code></pre>
+spaMM_full       &lt;- fitme(form_full,       data = data, family = gaussian())</code></pre>
+<pre><code>## Using paralellisation might be useful. See help(&quot;setNbThreads&quot;)</code></pre>
+<pre><code>## If the &#39;RSpectra&#39; package were installed, an extreme eigenvalue computation could be faster.</code></pre>
+<pre class="r"><code>spaMM_sig_RE     &lt;- fitme(form_sig_RE,     data = data, family = gaussian())</code></pre>
+<pre><code>## Using paralellisation might be useful. See help(&quot;setNbThreads&quot;)</code></pre>
+<pre class="r"><code>spaMM_sig_noFarm &lt;- fitme(form_sig_noFarm, data = data, family = gaussian())</code></pre>
+<pre><code>## Using paralellisation might be useful. See help(&quot;setNbThreads&quot;)</code></pre>
+<pre class="r"><code># Quick summaries 
+summary(spaMM_full)</code></pre>
+<pre><code>## formula: cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop + 
+##     summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days + 
+##     summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days + 
+##     winter_warm_day_count + Matern(1 | lat + lng) + (1 | year) + 
+##     (1 | farm)
+## ML: Estimation of corrPars, lambda and phi by ML.
+##     Estimation of fixed effects by ML.
+## Estimation of lambda and phi by &#39;outer&#39; ML, maximizing logL.
+## family: gaussian( link = identity ) 
+##  ------------ Fixed effects (beta) ------------
+##                              Estimate Cond. SE t-value
+## (Intercept)                 3.5936693 0.899543  3.9950
+## gdd                        -0.0280157 0.032119 -0.8722
+## cum_gdd                     0.1010461 0.030831  3.2774
+## croptype                   -0.0003512 0.001874 -0.1874
+## wei_intensity               0.1823322 0.046575  3.9148
+## wei_prop                    0.0493453 0.028099  1.7561
+## summer_avg_temp            -0.0860055 0.066007 -1.3030
+## summer_avg_percip          -0.0312987 0.035078 -0.8923
+## summer_heavy_rainfall_days -0.0811124 0.038113 -2.1282
+## summer_hottest_temp         0.0839335 0.064428  1.3028
+## winter_coldest_temp         0.1493931 0.069915  2.1368
+## winter_extreme_cold_days   -0.0361301 0.059626 -0.6059
+## winter_warm_day_count      -0.0838090 0.059051 -1.4193
+##  --------------- Random effects ---------------
+## Family: gaussian( link = identity ) 
+##                    --- Correlation parameters:
+##      1.nu     1.rho 
+## 0.3940684 0.8099135 
+##            --- Variance parameters (&#39;lambda&#39;):
+## lambda = var(u) for u ~ Gaussian; 
+##    lat + lng  :  1.503 
+##    year  :  0.6239 
+##    farm  :  0.4766  
+## # of obs: 3266; # of groups: lat + lng, 1790; year, 11; farm, 57 
+##  -------------- Residual variance  ------------
+## phi estimate was 1.89419 
+##  ------------- Likelihood values  -------------
+##                         logLik
+## logL       (p_v(h)): -5846.074</code></pre>
+<pre class="r"><code>summary(spaMM_sig_RE)</code></pre>
+<pre><code>## formula: cpb_abundance ~ cum_gdd + wei_intensity + summer_heavy_rainfall_days + 
+##     winter_coldest_temp + Matern(1 | lat + lng) + (1 | year) + 
+##     (1 | farm)
+## ML: Estimation of corrPars, lambda and phi by ML.
+##     Estimation of fixed effects by ML.
+## Estimation of lambda and phi by &#39;outer&#39; ML, maximizing logL.
+## family: gaussian( link = identity ) 
+##  ------------ Fixed effects (beta) ------------
+##                            Estimate Cond. SE t-value
+## (Intercept)                 3.52562  0.85545   4.121
+## cum_gdd                     0.09781  0.03056   3.200
+## wei_intensity               0.19680  0.04581   4.296
+## summer_heavy_rainfall_days -0.08942  0.03710  -2.410
+## winter_coldest_temp         0.11081  0.05911   1.875
+##  --------------- Random effects ---------------
+## Family: gaussian( link = identity ) 
+##                    --- Correlation parameters:
+##      1.nu     1.rho 
+## 0.3970611 0.8662859 
+##            --- Variance parameters (&#39;lambda&#39;):
+## lambda = var(u) for u ~ Gaussian; 
+##    lat + lng  :  1.408 
+##    year  :  0.5798 
+##    farm  :  0.4737  
+## # of obs: 3266; # of groups: lat + lng, 1790; year, 11; farm, 57 
+##  -------------- Residual variance  ------------
+## phi estimate was 1.90328 
+##  ------------- Likelihood values  -------------
+##                         logLik
+## logL       (p_v(h)): -5851.035</code></pre>
+<pre class="r"><code>summary(spaMM_sig_noFarm)</code></pre>
+<pre><code>## formula: cpb_abundance ~ cum_gdd + wei_intensity + summer_heavy_rainfall_days + 
+##     winter_coldest_temp + Matern(1 | lat + lng) + (1 | year)
+## ML: Estimation of corrPars, lambda and phi by ML.
+##     Estimation of fixed effects by ML.
+## Estimation of lambda and phi by &#39;outer&#39; ML, maximizing logL.
+## family: gaussian( link = identity ) 
+##  ------------ Fixed effects (beta) ------------
+##                            Estimate Cond. SE t-value
+## (Intercept)                 3.41846  0.56330   6.069
+## cum_gdd                     0.14096  0.02953   4.774
+## wei_intensity               0.18165  0.04787   3.794
+## summer_heavy_rainfall_days -0.08408  0.03787  -2.220
+## winter_coldest_temp         0.10717  0.06078   1.763
+##  --------------- Random effects ---------------
+## Family: gaussian( link = identity ) 
+##                    --- Correlation parameters:
+##      1.nu     1.rho 
+## 0.3181321 1.5962126 
+##            --- Variance parameters (&#39;lambda&#39;):
+## lambda = var(u) for u ~ Gaussian; 
+##    lat + lng  :  1.006 
+##    year  :  0.5736  
+## # of obs: 3266; # of groups: lat + lng, 1790; year, 11 
+##  -------------- Residual variance  ------------
+## phi estimate was 1.98517 
+##  ------------- Likelihood values  -------------
+##                         logLik
+## logL       (p_v(h)): -5913.748</code></pre>
+</div>
+<div id="metrics-helper" class="section level3">
+<h3>Metrics helper</h3>
+<pre class="r"><code>metrics_spaMM &lt;- function(mod, name) {
+  # AIC
+  aic &lt;- AIC(mod)
+
+  # MSE from residuals
+  mse &lt;- mean(residuals(mod)^2)
+
+  # Variance components:
+  # - fixed part via variance of fitted values (consistent with prior workflow)
+  var_fixed &lt;- var(predict(mod))
+
+  # Random components pulled from spaMM internals
+  lam &lt;- unname(mod$lambda)
+  nm  &lt;- names(mod$lambda)
+
+  v_spatial &lt;- if (&quot;lat + lng&quot; %in% nm) unname(mod$lambda[&quot;lat + lng&quot;]) else 0
+  v_year    &lt;- if (&quot;year&quot;      %in% nm) unname(mod$lambda[&quot;year&quot;])      else 0
+  v_farm    &lt;- if (&quot;farm&quot;      %in% nm) unname(mod$lambda[&quot;farm&quot;])      else 0
+
+  v_resid   &lt;- unname(mod$phi)
+
+  # R2 (Nakagawa-style; same logic you used)
+  denom &lt;- (var_fixed + v_spatial + v_year + v_farm + v_resid)
+  r2m   &lt;- var_fixed / denom
+  r2c   &lt;- (var_fixed + v_spatial + v_year + v_farm) / denom
+
+  tibble(
+    model = name,
+    AIC   = as.numeric(aic),
+    MSE   = as.numeric(mse),
+    R2_marginal    = as.numeric(r2m),
+    R2_conditional = as.numeric(r2c)
+  )
+}</code></pre>
+</div>
+<div id="compare-performance" class="section level3">
+<h3>Compare performance</h3>
+<pre class="r"><code>cmp &lt;- bind_rows(
+  metrics_spaMM(spaMM_full,       &quot;spaMM_full (all predictors + year + farm + Matérn)&quot;),
+  metrics_spaMM(spaMM_sig_RE,     &quot;spaMM_sig_RE (signif. predictors + year + farm + Matérn)&quot;),
+  metrics_spaMM(spaMM_sig_noFarm, &quot;spaMM_sig_noFarm (signif. predictors + year + Matérn)&quot;)
+) %&gt;%
+  mutate(
+    AIC = round(AIC, 1),
+    MSE = round(MSE, 3),
+    R2_marginal = round(R2_marginal, 3),
+    R2_conditional = round(R2_conditional, 3)
+  )</code></pre>
+</div>
+<div id="model-comparisons" class="section level3">
+<h3>Model comparisons</h3>
+<p>We compared three candidate spaMM models:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Full spaMM model</strong> including all screened predictors,
+year and farm random effects, and a Matérn spatial correlation
+term.<br />
+</li>
+<li><strong>Reduced spaMM model</strong> including only statistically
+significant predictors (cumulative GDD, weighted potato intensity, heavy
+rainfall days, and winter coldest-day temperature) together with year
+and farm random effects.<br />
+</li>
+<li><strong>Reduced spaMM without farm random effect</strong>, designed
+to match the prediction grid where farm identifiers are not
+available.</li>
+</ol>
+<p>All three models performed similarly in terms of predictive accuracy.
+The reduced specification with only significant predictors achieved
+nearly identical fit to the full model (slightly lower AIC, comparable
+<span class="math inline">\(R^2\)</span> values), demonstrating that
+unnecessary variables could be omitted without loss of performance. The
+no-farm model showed modestly lower conditional <span class="math inline">\(R^2\)</span>, but remained stable and
+interpretable, making it appropriate for statewide mapping where grid
+cells are treated independently of farm identity.</p>
+</div>
+<div id="performance-results" class="section level3">
+<h3>Performance results</h3>
+<pre class="r"><code>cmp[c(2, 6, 10), ]</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Estimate"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["Lower95"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Upper95"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"3.459443190","2":"2.83414574","3":"4.08474064","_rn_":"(Intercept)"},{"1":"-0.023890239","2":"-0.08786206","3":"0.04008158","_rn_":"gdd"},{"1":"0.094061013","2":"0.03308221","3":"0.15503981","_rn_":"cum_gdd"},{"1":"0.225144127","2":"0.15123179","3":"0.29905647","_rn_":"wei_intensity"},{"1":"0.041508243","2":"-0.01274211","3":"0.09575859","_rn_":"wei_prop"},{"1":"-0.073348902","2":"-0.19842543","3":"0.05172763","_rn_":"summer_avg_temp"},{"1":"-0.026753500","2":"-0.09177809","3":"0.03827109","_rn_":"summer_avg_percip"},{"1":"-0.085692026","2":"-0.16016342","3":"-0.01122063","_rn_":"summer_heavy_rainfall_days"},{"1":"0.071632511","2":"-0.04858059","3":"0.19184561","_rn_":"summer_hottest_temp"},{"1":"0.182356206","2":"0.04762722","3":"0.31708519","_rn_":"winter_coldest_temp"},{"1":"-0.006485623","2":"-0.12133239","3":"0.10836114","_rn_":"winter_extreme_cold_days"},{"1":"-0.096136389","2":"-0.20950845","3":"0.01723568","_rn_":"winter_warm_day_count"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["model"],"name":[1],"type":["chr"],"align":["left"]},{"label":["AIC"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MSE"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["R2_marginal"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["R2_conditional"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"spaMM_full (all predictors + year + farm + Matérn)","2":"11550.2","3":"1.795","4":"0.188","5":"0.658"},{"1":"spaMM_sig_RE (signif. predictors + year + farm + Matérn)","2":"11548.0","3":"1.805","4":"0.192","5":"0.648"},{"1":"spaMM_sig_noFarm (signif. predictors + year + Matérn)","2":"11714.2","3":"1.865","4":"0.207","5":"0.559"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 </div>
-<div id="si-plots-gam-smooths-re-caterpillars-from-the-mgcv-gam" class="section level2">
-<h2>SI PLOTS: GAM smooths + RE caterpillars (from the mgcv GAM)</h2>
-<pre class="r"><code># Make sure these are loaded
-if (!requireNamespace(&quot;gratia&quot;, quietly = TRUE)) install.packages(&quot;gratia&quot;)
-if (!requireNamespace(&quot;patchwork&quot;, quietly = TRUE)) install.packages(&quot;patchwork&quot;)
-library(gratia)
-library(ggplot2)
-library(patchwork)
-
-# (Re)create the three panels (no harm if they already exist)
-labs &lt;- gratia::smooths(gam_model)
-idx_space &lt;- which(grepl(&quot;^s\\(lat,\\s*lng\\)$&quot;, labs))
-idx_year  &lt;- which(grepl(&quot;^s\\(year\\)$&quot;, labs))
-idx_farm  &lt;- which(grepl(&quot;^s\\(farm\\)$&quot;, labs))
-
-stopifnot(length(idx_space)==1, length(idx_year)==1, length(idx_farm)==1)
-
-p_space &lt;- gratia::draw(gam_model, select = idx_space, residuals = FALSE) +
-  ggtitle(&quot;Spatial smooth: s(lat, lng)&quot;)
-p_year  &lt;- gratia::draw(gam_model, select = idx_year,  residuals = FALSE) +
-  ggtitle(&quot;Random effect: s(year)&quot;)
-p_farm  &lt;- gratia::draw(gam_model, select = idx_farm,  residuals = FALSE) +
-  ggtitle(&quot;Random effect: s(farm)&quot;)
-
-# Save the individual panels (already worked for you, but keeping for completeness)
-ggsave(&quot;../fig/FigS1a_GAM_spatial_smooth.png&quot;, p_space, width = 6.5, height = 5.5, dpi = 300)
-ggsave(&quot;../fig/FigS1b_GAM_RE_year.png&quot;,        p_year,  width = 6.0, height = 6.5, dpi = 300)
-ggsave(&quot;../fig/FigS1c_GAM_RE_farm.png&quot;,        p_farm,  width = 6.0, height = 10.0, dpi = 300)
-
-# Use a design so p_space spans the top row; year and farm sit below (two columns)
-# Layout (2 cols):
-# Row1: C C  (p_space across both columns)
-# Row2: A B  (p_year, p_farm)
-design &lt;- &quot;
-CC
-AB
-&quot;
-
-figS1_combined &lt;- patchwork::wrap_plots(
-  A = p_year,
-  B = p_farm,
-  C = p_space,
-  design = design,
-  guides = &quot;collect&quot;
-)
-
-ggsave(&quot;../fig/FigS1_GAM_smooths_combined.png&quot;, figS1_combined,
-       width = 10, height = 10, dpi = 300)</code></pre>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>Given the similar performance of the full and reduced models, and the
+practical need to omit farm-level effects for grid-based prediction, we
+adopt the <strong>reduced spaMM without farm effect</strong> as the
+final model for generating the Wisconsin CPB risk map. This
+specification balances parsimony, stability, and predictive accuracy,
+while avoiding overfitting to local farm-level variation that cannot be
+projected statewide.</p>
 </div>
 
 

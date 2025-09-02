@@ -1747,7 +1747,7 @@ cat(&quot;\n--- Model spamm_RF (Fixed + Random) ---\n&quot;)</code></pre>
 <h2>Model spamm_SRF: Fixed + Random + Spatial</h2>
 <pre class="r"><code>spamm_SRF &lt;- fitme(
   cpb_abundance ~
-    gdd + cum_gdd + croptype + wei_intensity + wei_prop + summer_avg_temp + 
+    gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
     Matern(1 | lat + lng) + (1 | year) + (1 | farm),
@@ -1772,17 +1772,19 @@ cat(&quot;\n--- Model spamm_SRF (Fixed + Random + Spatial) ---\n&quot;)</code></
 <pre><code>## 
 ## --- Model spamm_SRF (Fixed + Random + Spatial) ---</code></pre>
 <pre class="r"><code>cat(&quot;AIC:           &quot;, round(AIC_SRF, 2), &quot;\n&quot;)</code></pre>
-<pre><code>## AIC:            11704.46 11522.46 11678.46 3078.62</code></pre>
+<pre><code>## AIC:            11728.18 11548.28 11704.18 3084.57</code></pre>
 <pre class="r"><code>cat(&quot;MSE:           &quot;, round(MSE_SRF, 3), &quot;\n&quot;)</code></pre>
-<pre><code>## MSE:            1.774</code></pre>
+<pre><code>## MSE:            1.795</code></pre>
 <pre class="r"><code>cat(&quot;R² (marginal): &quot;, round(R2m_SRF, 3), &quot;\n&quot;)</code></pre>
-<pre><code>## R² (marginal):  0.189</code></pre>
+<pre><code>## R² (marginal):  0.188</code></pre>
 <pre class="r"><code>cat(&quot;R² (conditional): &quot;, round(R2c_SRF, 3), &quot;\n&quot;)</code></pre>
-<pre><code>## R² (conditional):  0.665</code></pre>
+<pre><code>## R² (conditional):  0.658</code></pre>
 </div>
 <div id="summaries" class="section level2">
 <h2>Summaries</h2>
-<pre class="r"><code>summary(spamm_RF)</code></pre>
+<pre class="r"><code>saveRDS(spamm_SRF, file = &quot;../models/spamm_SRF_full.rds&quot;)
+
+summary(spamm_RF)</code></pre>
 <pre><code>## formula: cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop + 
 ##     summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days + 
 ##     summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days + 
@@ -1818,46 +1820,44 @@ cat(&quot;\n--- Model spamm_SRF (Fixed + Random + Spatial) ---\n&quot;)</code></
 ##                         logLik
 ## logL       (p_v(h)): -5928.909</code></pre>
 <pre class="r"><code>summary(spamm_SRF)</code></pre>
-<pre><code>## formula: cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop + 
-##     summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days + 
-##     summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days + 
-##     winter_warm_day_count + Matern(1 | lat + lng) + (1 | year) + 
-##     (1 | farm)
+<pre><code>## formula: cpb_abundance ~ gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
+##     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
+##     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count + 
+##     Matern(1 | lat + lng) + (1 | year) + (1 | farm)
 ## ML: Estimation of corrPars, lambda and phi by ML.
 ##     Estimation of fixed effects by ML.
 ## Estimation of lambda and phi by &#39;outer&#39; ML, maximizing logL.
 ## family: gaussian( link = identity ) 
 ##  ------------ Fixed effects (beta) ------------
 ##                            Estimate Cond. SE t-value
-## (Intercept)                 2.95202  0.93020  3.1735
-## gdd                        -0.03223  0.03200 -1.0072
-## cum_gdd                     0.07499  0.03113  2.4087
-## croptype                    0.69021  0.13574  5.0849
-## wei_intensity               0.19425  0.04666  4.1628
-## wei_prop                   -0.09249  0.03926 -2.3559
-## summer_avg_temp            -0.07226  0.06579 -1.0983
-## summer_avg_percip          -0.03316  0.03497 -0.9482
-## summer_heavy_rainfall_days -0.08380  0.03796 -2.2078
-## summer_hottest_temp         0.06800  0.06432  1.0573
-## winter_coldest_temp         0.15026  0.06966  2.1571
-## winter_extreme_cold_days   -0.03227  0.05942 -0.5431
-## winter_warm_day_count      -0.08440  0.05883 -1.4346
+## (Intercept)                 3.57941  0.89661  3.9921
+## gdd                        -0.02804  0.03212 -0.8729
+## cum_gdd                     0.10101  0.03083  3.2763
+## wei_intensity               0.18257  0.04656  3.9214
+## wei_prop                    0.04861  0.02783  1.7469
+## summer_avg_temp            -0.08544  0.06594 -1.2956
+## summer_avg_percip          -0.03131  0.03508 -0.8925
+## summer_heavy_rainfall_days -0.08120  0.03811 -2.1308
+## summer_hottest_temp         0.08359  0.06440  1.2979
+## winter_coldest_temp         0.14923  0.06991  2.1346
+## winter_extreme_cold_days   -0.03589  0.05962 -0.6020
+## winter_warm_day_count      -0.08415  0.05903 -1.4256
 ##  --------------- Random effects ---------------
 ## Family: gaussian( link = identity ) 
 ##                    --- Correlation parameters:
 ##      1.nu     1.rho 
-## 0.3864223 0.7606149 
+## 0.3940278 0.8087673 
 ##            --- Variance parameters (&#39;lambda&#39;):
 ## lambda = var(u) for u ~ Gaussian; 
-##    lat + lng  :  1.564 
-##    year  :  0.6277 
-##    farm  :  0.4725  
+##    lat + lng  :  1.503 
+##    year  :  0.6246 
+##    farm  :  0.4767  
 ## # of obs: 3266; # of groups: lat + lng, 1790; year, 11; farm, 57 
 ##  -------------- Residual variance  ------------
-## phi estimate was 1.87538 
+## phi estimate was 1.89426 
 ##  ------------- Likelihood values  -------------
 ##                         logLik
-## logL       (p_v(h)): -5833.232</code></pre>
+## logL       (p_v(h)): -5846.091</code></pre>
 </div>
 <div id="extract-the-conditional-aic-2nd-element-from-each-aic-vector" class="section level2">
 <h2>Extract the “conditional AIC” (2nd element) from each AIC
@@ -1871,7 +1871,64 @@ cat(
   &quot;Conditional AIC (spamm_SRF): &quot;, round(condAIC_SRF, 2), &quot;\n&quot;
 )</code></pre>
 <pre><code>## Conditional AIC (spamm_RF):   11757.98 
-##  Conditional AIC (spamm_SRF):  11522.46</code></pre>
+##  Conditional AIC (spamm_SRF):  11548.28</code></pre>
+<pre class="r"><code># extract the fixed‐effects table
+tab   &lt;- summary(spamm_SRF)$beta_table</code></pre>
+<pre><code>## formula: cpb_abundance ~ gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
+##     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
+##     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count + 
+##     Matern(1 | lat + lng) + (1 | year) + (1 | farm)
+## ML: Estimation of corrPars, lambda and phi by ML.
+##     Estimation of fixed effects by ML.
+## Estimation of lambda and phi by &#39;outer&#39; ML, maximizing logL.
+## family: gaussian( link = identity ) 
+##  ------------ Fixed effects (beta) ------------
+##                            Estimate Cond. SE t-value
+## (Intercept)                 3.57941  0.89661  3.9921
+## gdd                        -0.02804  0.03212 -0.8729
+## cum_gdd                     0.10101  0.03083  3.2763
+## wei_intensity               0.18257  0.04656  3.9214
+## wei_prop                    0.04861  0.02783  1.7469
+## summer_avg_temp            -0.08544  0.06594 -1.2956
+## summer_avg_percip          -0.03131  0.03508 -0.8925
+## summer_heavy_rainfall_days -0.08120  0.03811 -2.1308
+## summer_hottest_temp         0.08359  0.06440  1.2979
+## winter_coldest_temp         0.14923  0.06991  2.1346
+## winter_extreme_cold_days   -0.03589  0.05962 -0.6020
+## winter_warm_day_count      -0.08415  0.05903 -1.4256
+##  --------------- Random effects ---------------
+## Family: gaussian( link = identity ) 
+##                    --- Correlation parameters:
+##      1.nu     1.rho 
+## 0.3940278 0.8087673 
+##            --- Variance parameters (&#39;lambda&#39;):
+## lambda = var(u) for u ~ Gaussian; 
+##    lat + lng  :  1.503 
+##    year  :  0.6246 
+##    farm  :  0.4767  
+## # of obs: 3266; # of groups: lat + lng, 1790; year, 11; farm, 57 
+##  -------------- Residual variance  ------------
+## phi estimate was 1.89426 
+##  ------------- Likelihood values  -------------
+##                         logLik
+## logL       (p_v(h)): -5846.091</code></pre>
+<pre class="r"><code>est2  &lt;- tab[, &quot;Estimate&quot;]
+se2   &lt;- tab[, &quot;Cond. SE&quot;]
+
+# use normal quantile ~1.96 for large‐sample ML estimates
+z     &lt;- qnorm(0.975)
+
+CI_spamm &lt;- data.frame(
+  Estimate = est2,
+  Lower95  = est2 - z * se2,
+  Upper95  = est2 + z * se2
+)
+CI_spamm</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Estimate"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["Lower95"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Upper95"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"3.57940688","2":"1.822077094","3":"5.336736664","_rn_":"(Intercept)"},{"1":"-0.02803648","2":"-0.090989482","3":"0.034916530","_rn_":"gdd"},{"1":"0.10101027","2":"0.040583168","3":"0.161437363","_rn_":"cum_gdd"},{"1":"0.18256881","2":"0.091319821","3":"0.273817801","_rn_":"wei_intensity"},{"1":"0.04861251","2":"-0.005929558","3":"0.103154568","_rn_":"wei_prop"},{"1":"-0.08543907","2":"-0.214687262","3":"0.043809115","_rn_":"summer_avg_temp"},{"1":"-0.03130647","2":"-0.100057296","3":"0.037444351","_rn_":"summer_avg_percip"},{"1":"-0.08120338","2":"-0.155897788","3":"-0.006508963","_rn_":"summer_heavy_rainfall_days"},{"1":"0.08359077","2":"-0.042640285","3":"0.209821818","_rn_":"summer_hottest_temp"},{"1":"0.14923239","2":"0.012209381","3":"0.286255402","_rn_":"winter_coldest_temp"},{"1":"-0.03588918","2":"-0.152735828","3":"0.080957472","_rn_":"winter_extreme_cold_days"},{"1":"-0.08414893","2":"-0.199839708","3":"0.031541845","_rn_":"winter_warm_day_count"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
 </div>
 
 

@@ -55,7 +55,7 @@ data$year <- as.factor(data$year)
 
 ```{r}
 gam_model <- gam(cpb_abundance ~ s(lat, lng) + s(year, bs = "re") + s(farm, bs = "re") +
-                  gdd + cum_gdd + croptype + wei_intensity + wei_prop + summer_avg_temp + 
+                  gdd + cum_gdd  + wei_intensity + wei_prop + summer_avg_temp + 
                   summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
                   winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count,
                   data = data, family = gaussian())
@@ -91,5 +91,55 @@ CI_gam  <- data.frame(
   Upper95  = est + t * se
 )
 CI_gam
+```
+## SI PLOTS: GAM smooths + RE caterpillars (from the mgcv GAM)
+
+```{r}
+# Make sure these are loaded
+if (!requireNamespace("gratia", quietly = TRUE)) install.packages("gratia")
+if (!requireNamespace("patchwork", quietly = TRUE)) install.packages("patchwork")
+library(gratia)
+library(ggplot2)
+library(patchwork)
+
+# (Re)create the three panels (no harm if they already exist)
+labs <- gratia::smooths(gam_model)
+idx_space <- which(grepl("^s\\(lat,\\s*lng\\)$", labs))
+idx_year  <- which(grepl("^s\\(year\\)$", labs))
+idx_farm  <- which(grepl("^s\\(farm\\)$", labs))
+
+stopifnot(length(idx_space)==1, length(idx_year)==1, length(idx_farm)==1)
+
+p_space <- gratia::draw(gam_model, select = idx_space, residuals = FALSE) +
+  ggtitle("Spatial smooth: s(lat, lng)")
+p_year  <- gratia::draw(gam_model, select = idx_year,  residuals = FALSE) +
+  ggtitle("Random effect: s(year)")
+p_farm  <- gratia::draw(gam_model, select = idx_farm,  residuals = FALSE) +
+  ggtitle("Random effect: s(farm)")
+
+# Save the individual panels (already worked for you, but keeping for completeness)
+ggsave("../fig/FigS1a_GAM_spatial_smooth.png", p_space, width = 6.5, height = 5.5, dpi = 300)
+ggsave("../fig/FigS1b_GAM_RE_year.png",        p_year,  width = 6.0, height = 6.5, dpi = 300)
+ggsave("../fig/FigS1c_GAM_RE_farm.png",        p_farm,  width = 6.0, height = 10.0, dpi = 300)
+
+# Use a design so p_space spans the top row; year and farm sit below (two columns)
+# Layout (2 cols):
+# Row1: C C  (p_space across both columns)
+# Row2: A B  (p_year, p_farm)
+design <- "
+CC
+AB
+"
+
+figS1_combined <- patchwork::wrap_plots(
+  A = p_year,
+  B = p_farm,
+  C = p_space,
+  design = design,
+  guides = "collect"
+)
+
+ggsave("../fig/FigS1_GAM_smooths_combined.png", figS1_combined,
+       width = 10, height = 10, dpi = 300)
 ```
 

@@ -16,7 +16,7 @@ print(dim(data))
 
 # Create target: average CPB abundance
 data$cpb_abundance <- (data$cpba_count + data$cpbl_count) / 2
-data$croptype <- ifelse(data$croptype == 43, 1, 0)
+#data$croptype <- ifelse(data$croptype == 43, 1, 0)
 
 
 # --- Scale numeric predictors
@@ -24,8 +24,7 @@ numeric_vars <- c(
   "gdd", "cum_gdd", "wei_intensity", "wei_prop",
   "summer_avg_temp", "summer_avg_percip", "summer_heavy_rainfall_days",
   "summer_hottest_temp","summer_temp_variability", "winter_coldest_temp",
-  "winter_extreme_cold_days",
-  "winter_warm_day_count"
+  "winter_extreme_cold_days", "winter_warm_day_count"
 )
 
 # Scale each numeric variable if it exists in data
@@ -33,7 +32,6 @@ for (v in numeric_vars) {
   if (v %in% names(data)) data[[v]] <- scale(data[[v]])
 }
 
-nrow(data[data['croptype']==1,])
 
 # find every column that is still a matrix, turn it into numeric
 matrix_vars <- names(data)[sapply(data, is.matrix)]
@@ -54,7 +52,7 @@ anova(model_farm, model_farm_year)
 
 # --- Full mixed-effects model
 full_model <- lmer(
-  cpb_abundance ~ gdd + cum_gdd + croptype + wei_intensity + wei_prop +
+  cpb_abundance ~ gdd + cum_gdd + wei_intensity + wei_prop +
     summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days +
     summer_temp_variability + summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days +
     winter_warm_day_count +
@@ -106,7 +104,7 @@ data$farm <- as.factor(data$farm)
 data$year <- as.factor(data$year)
 
 gam_model <- gam(cpb_abundance ~ s(lat, lng) + s(year, bs = "re") + s(farm, bs = "re") +
-                   gdd + cum_gdd + croptype + wei_intensity + wei_prop +
+                   gdd + cum_gdd + wei_intensity + wei_prop +
                    summer_avg_temp + summer_avg_percip + summer_heavy_rainfall_days +
                    summer_temp_variability + summer_hottest_temp + winter_coldest_temp + winter_extreme_cold_days +
                    winter_warm_day_count,
@@ -217,7 +215,7 @@ if (!require(spaMM)) {
 
 spamm_SRF <- fitme(
   cpb_abundance ~
-    gdd + cum_gdd + croptype + wei_intensity + wei_prop + summer_avg_temp + 
+    gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
     Matern(1 | lat + lng) + (1 | year) + (1 | farm),

@@ -95,7 +95,7 @@ cat("R² (conditional): ", round(R2c_RF, 3), "\n")
 ```{r}
 spamm_SRF <- fitme(
   cpb_abundance ~
-    gdd + cum_gdd + croptype + wei_intensity + wei_prop + summer_avg_temp + 
+    gdd + cum_gdd + wei_intensity + wei_prop + summer_avg_temp + 
     summer_avg_percip + summer_heavy_rainfall_days + summer_hottest_temp + 
     winter_coldest_temp + winter_extreme_cold_days + winter_warm_day_count +
     Matern(1 | lat + lng) + (1 | year) + (1 | farm),
@@ -128,6 +128,8 @@ cat("R² (conditional): ", round(R2c_SRF, 3), "\n")
 ## Summaries
 
 ```{r}
+saveRDS(spamm_SRF, file = "../models/spamm_SRF_full.rds")
+
 summary(spamm_RF)
 summary(spamm_SRF)
 ```
@@ -163,5 +165,207 @@ CI_spamm <- data.frame(
 )
 CI_spamm
 ```
+
+## Figure 1. Sampling locations map
+
+
+```{r}
+
+# --- Statewide map (full Wisconsin extent)
+# (adds county outlines for context)
+wi_counties <- map_data("county") %>% dplyr::filter(region == "wisconsin")
+
+fig1a_state <- ggplot() +
+  geom_polygon(data = wi_poly, aes(long, lat, group = group),
+               fill = "grey95", color = "grey70", linewidth = 0.3) +
+  geom_polygon(data = wi_counties, aes(long, lat, group = group),
+               fill = NA, color = "grey85", linewidth = 0.2) +
+  geom_point(data = data, aes(x = lng, y = lat),
+             alpha = 0.6, size = 0.9) +
+  coord_quickmap() +
+  labs(x = "Longitude", y = "Latitude",
+       title = "Sampling locations across Wisconsin (statewide)") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+print(fig1a_state)
+ggsave("../fig/Fig1a_sampling_statewide.png", fig1a_state, width = 6.5, height = 5, dpi = 300)
+
+# --- Zoomed map (your original extent-based crop)
+fig1b_zoom <- fig1_sampling +
+  ggtitle("Sampling locations (zoom on sampled extent)")
+print(fig1b_zoom)
+ggsave("../fig/Fig1b_sampling_zoom.png", fig1b_zoom, width = 6.5, height = 5, dpi = 300)
+
+# --- (Optional) side-by-side export
+if (!requireNamespace("cowplot", quietly = TRUE)) install.packages("cowplot")
+library(cowplot)
+fig1_side_by_side <- cowplot::plot_grid(fig1a_state, fig1b_zoom, nrow = 1, labels = c("A", "B"))
+ggsave("../fig/Fig1_sampling_statewide_and_zoom.png", fig1_side_by_side, width = 12, height = 5, dpi = 300)
+
+```
+
+
+
+## Figure 2. Spatial random field from spaMM (Matern effect only)
+
+```{r}
+# ─────────────────────────────────────────────────────────────────────────────
+# Build coords_df (points with spatial BLUPs) and grid_df (interpolated surface)
+# ─────────────────────────────────────────────────────────────────────────────
+if (!requireNamespace("akima", quietly = TRUE)) install.packages("akima")
+if (!requireNamespace("viridis", quietly = TRUE)) install.packages("viridis")
+if (!requireNamespace("scales", quietly = TRUE)) install.packages("scales")
+library(akima); library(ggplot2); library(viridis); library(scales)
+
+# 1) Extract the Matern random effects (BLUPs)
+rL <- ranef(spamm_SRF)
+mat_name <- grep("Matern", names(rL), value = TRUE)        # e.g., "Matern(1 | lat + lng)"
+stopifnot(length(mat_name) == 1)
+mat_re <- as.numeric(rL[[mat_name]])                       # vector of BLUPs
+
+# 2) Reconstruct the unique coordinate table in the same order spaMM used
+uniq_coords <- unique(data[c("lat","lng")])                # first occurrence order
+if (nrow(uniq_coords) != length(mat_re)) {
+  stop("Length mismatch between unique coords and Matern BLUPs. 
+       Check for any preprocessing that changed 'data' after fitting.")
+}
+uniq_coords$sp_re <- mat_re
+
+# 3) Map each observation to its spatial BLUP
+key_obs  <- paste(data$lat, data$lng)
+key_uniq <- paste(uniq_coords$lat, uniq_coords$lng)
+coords_df <- data.frame(
+  lng   = data$lng,
+  lat   = data$lat,
+  sp_re = uniq_coords$sp_re[ match(key_obs, key_uniq) ]
+)
+
+# 4) Interpolate to a regular grid (no extrapolation outside convex hull)
+interp_grid <- akima::interp(
+  x         = coords_df$lng,
+  y         = coords_df$lat,
+  z         = coords_df$sp_re,
+  duplicate = "mean",
+  nx        = 300, ny = 300,
+  extrap    = FALSE
+)
+grid_df <- expand.grid(lng = interp_grid$x, lat = interp_grid$y)
+grid_df$sp_re <- as.vector(interp_grid$z)
+grid_df <- grid_df[!is.na(grid_df$sp_re), ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Figure 2b. Zoomed spatial random field (no WI outline), lon/lat axes
+# ─────────────────────────────────────────────────────────────────────────────
+pad_x <- 0.05
+pad_y <- 0.05
+x_rng <- range(coords_df$lng, na.rm = TRUE) + c(-pad_x, pad_x)
+y_rng <- range(coords_df$lat, na.rm = TRUE) + c(-pad_y, pad_y)
+
+grid_zoom <- subset(
+  grid_df,
+  lng >= x_rng[1] & lng <= x_rng[2] &
+  lat >= y_rng[1] & lat <= y_rng[2]
+)
+
+fig2_spatial_zoom <- ggplot(grid_zoom, aes(lng, lat, fill = sp_re)) +
+  geom_raster(interpolate = TRUE) +
+  geom_contour(aes(z = sp_re), colour = "white", alpha = 0.35, linewidth = 0.25, bins = 8) +
+  # (optional) show sampling points for context:
+  # geom_point(data = coords_df, aes(lng, lat), inherit.aes = FALSE,
+  #            size = 0.25, alpha = 0.25, colour = "black") +
+  coord_equal(xlim = x_rng, ylim = y_rng, expand = FALSE) +
+  scale_fill_viridis_c(name = "Spatial effect", option = "magma") +
+  scale_x_continuous("Longitude", breaks = scales::pretty_breaks(6)) +
+  scale_y_continuous("Latitude",  breaks = scales::pretty_breaks(6)) +
+  labs(title = "Spatial random field (Matérn)") +
+  theme_classic(base_size = 11) +
+  theme(
+    panel.border   = element_rect(colour = "grey50", fill = NA, linewidth = 0.4),
+    plot.title     = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+print(fig2_spatial_zoom)
+# Save (uncomment when ready)
+ggsave("../fig/Fig2b_spatial_random_field_zoom.png",
+        fig2_spatial_zoom, width = 6.5, height = 5.2, dpi = 300)
+```
+## Figure 3: Partial effect plots for significant predictors (fixed effects only)
+
+```{r}
+# ─────────────────────────────────────────────────────────────────────────────
+# Figure 3 (fixed): Partial effect plots for significant predictors (fixed only)
+# ─────────────────────────────────────────────────────────────────────────────
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tidyr)
+
+# Build a newdata grid varying ONE scaled variable; others fixed at 0 (their mean)
+make_effect_df <- function(var_name, n = 120) {
+  base <- list(
+    lat = mean(data$lat),
+    lng = mean(data$lng),
+    year = factor(levels(data$year)[1], levels = levels(data$year)),
+    farm = factor(levels(data$farm)[1], levels = levels(data$farm)),
+    gdd = 0, cum_gdd = 0, wei_intensity = 0, wei_prop = 0,
+    summer_avg_temp = 0, summer_avg_percip = 0, summer_heavy_rainfall_days = 0,
+    summer_hottest_temp = 0, winter_coldest_temp = 0,
+    winter_extreme_cold_days = 0, winter_warm_day_count = 0
+  )
+  rng <- range(as.numeric(data[[var_name]]), na.rm = TRUE)
+  base[[var_name]] <- seq(rng[1], rng[2], length.out = n)
+  nd <- as.data.frame(base)
+  nd$x   <- nd[[var_name]]
+  nd$fit <- as.numeric(predict(spamm_SRF, newdata = nd, type = "response", level = 0)) # <- numeric!
+  nd$variable <- var_name
+  nd[, c("x","fit","variable")]
+}
+
+vars_to_plot <- c("cum_gdd","wei_intensity","summer_heavy_rainfall_days","winter_coldest_temp")
+eff_df <- bind_rows(lapply(vars_to_plot, make_effect_df))
+
+var_labs <- c(
+  cum_gdd = "Cumulative GDD (scaled)",
+  wei_intensity = "Weighted potato intensity (scaled)",
+  summer_heavy_rainfall_days = "Summer heavy rainfall days (scaled)",
+  winter_coldest_temp = "Winter coldest temperature (scaled)"
+)
+
+fig3_partial <- ggplot(eff_df, aes(x = x, y = fit)) +
+  geom_line() +
+  facet_wrap(~ variable, scales = "free_x", ncol = 2, labeller = as_labeller(var_labs)) +
+  labs(x = "Scaled predictor", y = "Predicted abundance (fixed effects only)",
+       title = "Partial effects from spaMM (fixed effects only)") +
+  theme_minimal()
+
+print(fig3_partial)
+ggsave("../fig/Fig3_partial_effects.png", fig3_partial, width = 7, height = 6, dpi = 300)
+```
+
+## Figure 4: Residual diagnostics (spaMM) – Residuals vs Fitted & QQ-plot
+
+```{r}
+# ─────────────────────────────────────────────────────────────────────────────
+# Figure 4 (base R): Residuals vs Fitted & QQ-plot to PNG
+# ─────────────────────────────────────────────────────────────────────────────
+resid_vals  <- residuals(spamm_SRF, type = "response")
+fitted_vals <- fitted(spamm_SRF)
+
+png("../fig/Fig4_residual_diagnostics.png", width = 1600, height = 800, res = 200)
+par(mfrow = c(1, 2), mar = c(4,4,2,1))
+
+plot(fitted_vals, resid_vals,
+     xlab = "Fitted values", ylab = "Residuals",
+     main = "Residuals vs Fitted", pch = 16, col = rgb(0,0,0,0.3))
+abline(h = 0, lty = 2)
+
+qqnorm(resid_vals, main = "Normal Q–Q of residuals",
+       pch = 16, col = rgb(0,0,0,0.3))
+qqline(resid_vals, col = "red", lty = 2)
+
+dev.off()
+```
+
 
 
